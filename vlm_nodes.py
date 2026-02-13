@@ -387,6 +387,62 @@ Output ONLY the prompt. No labels, no markdown, no quotes."""
 
 
 # ──────────────────────────────────────────────
+# Dataset generation prompt (nanobanana → Qwen 2512 LoRA training)
+# ──────────────────────────────────────────────
+
+PROSE_SYSTEM_DATASET = """\
+You generate TWO outputs for a character LoRA training dataset pipeline.
+
+You receive a reference image of the subject and scene parameters as JSON.
+A separate system (nanobanana / Gemini) will use your first output to generate \
+a photorealistic training image. Your second output becomes the .txt caption \
+paired with that image for Qwen 2512 LoRA training on AI Toolkit.
+
+─── OUTPUT FORMAT ───
+Respond with EXACTLY two sections separated by the delimiter ---CAPTION---
+No reasoning, no labels, no markdown, no quotes.
+
+SECTION 1 (nanobanana generation prompt):
+A detailed natural-language instruction for Gemini to generate a photorealistic \
+image of the person from the reference. Include:
+- "Generate a photorealistic photo of the person from the reference image"
+- Pose/action, outfit, hairstyle (from settings)
+- Environment/scene with specific details
+- Lighting — be vivid and specific, this drives realism
+- Camera framing, lens, depth of field
+- Mood and color grading
+- "Maintain exact facial likeness, body proportions, and all identifying \
+features from the reference"
+Write as one flowing paragraph. Be specific enough that Gemini produces \
+a high-quality, diverse training image.
+
+SECTION 2 (LoRA training caption — after ---CAPTION---):
+A 1-3 sentence natural-language caption for the .txt file. Rules:
+- Start with: [trigger]
+- Describe ONLY what varies: pose, outfit, lighting, background, expression, \
+camera framing, mood
+- NEVER describe the subject's permanent physical features (face shape, \
+eye color, skin tone, body type, height) — the model learns these implicitly \
+from the images and ties them to the trigger word
+- Use clear flowing prose — no bullet points, no keywords, no markdown
+- Keep it concise — the model learns better from clean, focused captions
+
+─── EXAMPLE OUTPUT ───
+Generate a photorealistic photo of the person from the reference image, \
+standing with one hand on hip wearing a white oversized t-shirt and denim \
+shorts. Set in a cozy cafe with warm wood tones and soft ambient lighting. \
+Golden hour sunlight streams through a large window casting warm amber tones \
+and gentle shadows across the scene. Waist-up portrait framed at 85mm with \
+shallow depth of field softly blurring the background. Casual relaxed mood \
+with natural warm color grading. Maintain exact facial likeness, body \
+proportions, and all identifying features from the reference.
+---CAPTION---
+[trigger], standing with one hand on hip wearing a white oversized t-shirt \
+and denim shorts, golden hour sunlight streaming through a cafe window, \
+warm amber tones, waist-up portrait shot at 85mm with shallow depth of field."""
+
+
+# ──────────────────────────────────────────────
 # Claude Code helper
 # ──────────────────────────────────────────────
 
@@ -486,6 +542,7 @@ REFINER_MODES = [
     "describe & enhance",
     "image edit aware",
     "caption only",
+    "dataset generation",
 ]
 
 
@@ -530,6 +587,8 @@ class KPPBVLMRefiner:
                                                 "tooltip": "Use Claude Code CLI instead of Ollama — does both stages in one shot with images"}),
                 "claude_model": (CLAUDE_MODELS, {"default": "opus",
                                                   "tooltip": "Claude model to use (sonnet recommended for speed/quality balance)"}),
+                "trigger_word": ("STRING", {"default": "ohwx",
+                                            "tooltip": "Trigger word for LoRA training captions (dataset generation mode only)"}),
             },
         }
 
@@ -556,6 +615,7 @@ class KPPBVLMRefiner:
         unload_model=True,
         use_claude_code=False,
         claude_model="opus",
+        trigger_word="ohwx",
     ):
         # ── Encode all images to base64 (needed by both paths) ──
         images_b64 = []
@@ -593,6 +653,8 @@ class KPPBVLMRefiner:
                 claude_sys = PROSE_SYSTEM
             elif mode == "image edit aware":
                 claude_sys = PROSE_SYSTEM_EDIT
+            elif mode == "dataset generation":
+                claude_sys = PROSE_SYSTEM_DATASET
             else:
                 claude_sys = PROSE_SYSTEM_CAPTION
 
@@ -622,6 +684,15 @@ class KPPBVLMRefiner:
                     "Write a prompt describing the FINAL scene after edits, "
                     "preserving the character's identity from Image 1."
                 )
+            elif mode == "dataset generation":
+                if prompt_json and prompt_json.strip():
+                    parts.append(f"SCENE SETTINGS:\n```json\n{prompt_json.strip()}\n```")
+                parts.append(f"TRIGGER WORD: {trigger_word}")
+                parts.append(
+                    "Generate the nanobanana prompt and LoRA training caption. "
+                    "Use [trigger] as placeholder in the caption — it will be "
+                    "replaced with the trigger word automatically."
+                )
             else:
                 parts.append(
                     "Describe Image 1 as an optimized Klein 9B generation prompt in one concise paragraph."
@@ -643,15 +714,32 @@ class KPPBVLMRefiner:
                 lines = result.split("\n")
                 lines = [l for l in lines if not l.strip().startswith("```")]
                 result = "\n".join(lines).strip()
-            if result and not result.endswith("."):
-                result += "."
 
-            if not result or result == ".":
+            if not result or result.strip() == "":
                 if positive_prompt and positive_prompt.strip():
                     result = positive_prompt.strip()
                     print(f"[KPPB] Claude returned empty — passing through positive_prompt")
                 else:
                     result = "photorealistic portrait."
+
+            # ── Dataset generation: split into prompt + caption ──
+            if mode == "dataset generation" and "---CAPTION---" in result:
+                parts_split = result.split("---CAPTION---", 1)
+                gen_prompt = parts_split[0].strip()
+                caption = parts_split[1].strip()
+                # Replace [trigger] placeholder with actual trigger word
+                caption = caption.replace("[trigger]", trigger_word)
+                if gen_prompt and not gen_prompt.endswith("."):
+                    gen_prompt += "."
+                if caption and not caption.endswith("."):
+                    caption += "."
+                print(f"[KPPB] ═══ DATASET OUTPUT ═══")
+                print(f"[KPPB] Generation prompt ({len(gen_prompt)} chars): {gen_prompt[:300]}")
+                print(f"[KPPB] Training caption ({len(caption)} chars): {caption[:300]}")
+                return (gen_prompt, caption)
+
+            if result and not result.endswith("."):
+                result += "."
 
             # ── Append identity lock phrase ──
             if preserve_identity:
