@@ -1,4 +1,13 @@
 import json
+import os
+
+# ── NSFW config ──
+_DIR = os.path.dirname(os.path.abspath(__file__))
+try:
+    with open(os.path.join(_DIR, "config.json"), "r") as _f:
+        _NSFW_ENABLED = json.load(_f).get("nsfw", False)
+except (FileNotFoundError, json.JSONDecodeError):
+    _NSFW_ENABLED = False
 
 # ──────────────────────────────────────────────
 # Identity preservation phrase (appended when
@@ -335,7 +344,7 @@ class KPPBPromptBuilder:
 
     @classmethod
     def INPUT_TYPES(cls):
-        return {
+        inputs = {
             "required": {
                 "subject": ("STRING", {"multiline": True, "default": ""}),
                 "pose": (POSES, {"default": _REF}),
@@ -361,14 +370,16 @@ class KPPBPromptBuilder:
                 "mood": ("STRING", {"default": ""}),
                 "extra_details": ("STRING", {"multiline": True, "default": ""}),
                 "negative_prompt": ("STRING", {"multiline": True, "default": ""}),
-                "expose_breasts": ("BOOLEAN", {"default": False,
-                    "tooltip": "ON: clothing adjusted to reveal breasts. OFF: nipples always concealed by fabric, hands, or hair"}),
-                "remove_bra": ("BOOLEAN", {"default": False,
-                    "tooltip": "No bra under clothing"}),
-                "remove_panties": ("BOOLEAN", {"default": False,
-                    "tooltip": "No panties/underwear — only visible if pose or camera angle reveals it"}),
             },
         }
+        if _NSFW_ENABLED:
+            inputs["optional"]["expose_breasts"] = ("BOOLEAN", {"default": False,
+                "tooltip": "ON: clothing adjusted to reveal breasts. OFF: nipples always concealed by fabric, hands, or hair"})
+            inputs["optional"]["remove_bra"] = ("BOOLEAN", {"default": False,
+                "tooltip": "No bra under clothing"})
+            inputs["optional"]["remove_panties"] = ("BOOLEAN", {"default": False,
+                "tooltip": "No panties/underwear — only visible if pose or camera angle reveals it"})
+        return inputs
 
     RETURN_TYPES = ("STRING", "STRING", "STRING")
     RETURN_NAMES = ("positive_prompt", "negative_prompt", "prompt_json")
@@ -438,20 +449,21 @@ class KPPBPromptBuilder:
         if outfit and outfit.strip():
             sentences.append(outfit.strip().rstrip("."))
 
-        # 3b. Exposure control (after outfit)
-        exposure = []
-        if expose_breasts:
-            exposure.append("clothing adjusted to expose breasts")
-            if remove_bra:
-                exposure.append("no bra")
-        else:
-            exposure.append("nipples fully concealed by clothing, fabric, hands, or hair")
-            exposure.append("breasts fully covered by outfit")
-        if remove_panties:
-            exposure.append("not wearing panties")
-        else:
-            exposure.append("underwear or lingerie covering intimate areas")
-        sentences.append(", ".join(exposure).capitalize())
+        # 3b. Exposure control (after outfit) — only when NSFW mode is on
+        if _NSFW_ENABLED:
+            exposure = []
+            if expose_breasts:
+                exposure.append("clothing adjusted to expose breasts")
+                if remove_bra:
+                    exposure.append("no bra")
+            else:
+                exposure.append("nipples fully concealed by clothing, fabric, hands, or hair")
+                exposure.append("breasts fully covered by outfit")
+            if remove_panties:
+                exposure.append("not wearing panties")
+            else:
+                exposure.append("underwear or lingerie covering intimate areas")
+            sentences.append(", ".join(exposure).capitalize())
 
         # 4. Environment / scene
         if environment and environment.strip():
@@ -525,10 +537,11 @@ class KPPBPromptBuilder:
         neg_parts.append("saggy breasts, torpedo breasts, droopy breasts, pendulous breasts, tubular breasts, uneven breasts, deflated breasts")
         neg_parts.append("extra fingers, extra hands, extra limbs, missing fingers, fused fingers, mutated hands, deformed hands, phantom limb, floating hand, disembodied hand, extra arms, bad anatomy, malformed limbs, wrong number of fingers, six fingers, disfigured, ugly, blurry, watermark, text, logo, signature")
         # Exposure-based negatives
-        if not expose_breasts:
-            neg_parts.append("exposed nipples, bare breasts, lifted shirt, shirt pulled up, topless, areola visible")
-        if not remove_panties:
-            neg_parts.append("exposed genitals, no underwear, pantyless, bottomless")
+        if _NSFW_ENABLED:
+            if not expose_breasts:
+                neg_parts.append("exposed nipples, bare breasts, lifted shirt, shirt pulled up, topless, areola visible")
+            if not remove_panties:
+                neg_parts.append("exposed genitals, no underwear, pantyless, bottomless")
         negative_prompt = ", ".join(neg_parts)
 
         # Assemble
