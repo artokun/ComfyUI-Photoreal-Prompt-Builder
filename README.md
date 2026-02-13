@@ -9,7 +9,6 @@ A structured prompt builder for photorealistic image generation with **FLUX Klei
 - **Image Edit Composer** — Structured editing instructions (add/remove/replace elements, quick IG effects)
 - **VLM Prompt Refiner** — Vision language model integration via Ollama or Claude Code CLI. Sees your reference images and merges character identity with scene settings in a single shot
 - **List Nodes** — Boolean-toggle selectors for batch generation via XY Plot Queue (scenes, poses, shots, lighting, outfits, actions, hairstyles, effects, and more)
-- **Optional NSFW Module** — Adult content expansions in a separate folder you can delete
 
 ## Installation
 
@@ -91,20 +90,33 @@ Boolean-toggle selectors that output `LIST` + `INT` count for XY Plot Queue batc
 
 ## NSFW Module
 
-The `nsfw_pack/` folder contains optional adult content:
+An optional NSFW expansion module is available as a separate submodule. It adds explicit pose, action, and group action expansions plus corresponding list nodes. See the [NSFW module repo](https://github.com/artokun/ComfyUI-Photoreal-Prompt-Builder-NSFW) for details on what's included.
 
-- **NSFW pose expansions** — 31 explicit pose descriptions
-- **NSFW action expansions** — 32 solo action descriptions
-- **NSFW group action expansions** — 35 couples/partner action descriptions
-- **NSFW List Nodes** — Action List, Group Action List, Pose List
+NSFW content is **disabled by default** and not downloaded during installation.
 
-### Removing NSFW Content
+### Enabling
 
-Delete the `nsfw_pack/` folder. The core prompt builder continues to work with SFW content only — no errors, no missing nodes. NSFW list nodes simply won't appear in the node menu.
+Edit `config.json` in the node folder:
 
-```bash
-rm -rf custom_nodes/comfyui-klein-photoreal-promptbuilder/nsfw_pack
+```json
+{
+  "nsfw": true
+}
 ```
+
+Restart ComfyUI. The submodule will be fetched automatically and the NSFW nodes will appear in the node menu.
+
+### Disabling
+
+Set the flag back to `false`:
+
+```json
+{
+  "nsfw": false
+}
+```
+
+Restart ComfyUI. The NSFW module files will be cleaned up automatically and the nodes will be removed from the menu.
 
 ## VLM Setup
 

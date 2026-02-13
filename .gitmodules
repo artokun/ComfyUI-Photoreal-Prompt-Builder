@@ -1,0 +1,3 @@
+[submodule "nsfw_pack"]
+	path = nsfw_pack
+	url = https://github.com/artokun/ComfyUI-Photoreal-Prompt-Builder-NSFW.git

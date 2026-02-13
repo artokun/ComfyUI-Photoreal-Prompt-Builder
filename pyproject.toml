@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-klein-photoreal-promptbuilder"
-version = "1.0.0"
+version = "0.0.1"
 description = "Structured photorealistic prompt builder for FLUX Klein 9B in ComfyUI"
 license = "MIT"
 readme = "README.md"
