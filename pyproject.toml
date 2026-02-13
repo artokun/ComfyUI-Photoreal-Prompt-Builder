@@ -1,0 +1,16 @@
+[project]
+name = "comfyui-klein-photoreal-promptbuilder"
+version = "1.0.0"
+description = "Structured photorealistic prompt builder for FLUX Klein 9B in ComfyUI"
+license = "MIT"
+readme = "README.md"
+requires-python = ">=3.10"
+
+[project.urls]
+Repository = "https://github.com/artokun/ComfyUI-Photoreal-Prompt-Builder"
+Issues = "https://github.com/artokun/ComfyUI-Photoreal-Prompt-Builder/issues"
+
+[tool.comfy]
+PublisherId = "artokun"
+DisplayName = "Photoreal Prompt Builder"
+Icon = ""
