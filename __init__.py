@@ -86,13 +86,17 @@ from .list_nodes import (
     KPPBActionList,
     KPPBGroupActionList,
 )
-from .vlm_nodes import KPPBVLMRefiner
+try:
+    from .vlm_nodes import KPPBVLMRefiner
+    _vlm_available = True
+except ImportError:
+    _vlm_available = False
+    print("[KPPB] Warning: VLM Refiner unavailable (missing numpy/Pillow).")
 
 NODE_CLASS_MAPPINGS = {
     "KPPBPromptBuilder": KPPBPromptBuilder,
     "KPPBOutfitComposer": KPPBOutfitComposer,
     "KPPBImageEditComposer": KPPBImageEditComposer,
-    "KPPBVLMRefiner": KPPBVLMRefiner,
     "KPPBSceneList": KPPBSceneList,
     "KPPBPoseList": KPPBPoseList,
     "KPPBShotTypeList": KPPBShotTypeList,
@@ -110,7 +114,6 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "KPPBPromptBuilder": "Prompt Builder (kppb)",
     "KPPBOutfitComposer": "Outfit Composer (kppb)",
     "KPPBImageEditComposer": "Image Edit Composer (kppb)",
-    "KPPBVLMRefiner": "VLM Prompt Refiner (kppb)",
     "KPPBSceneList": "Scene List (kppb)",
     "KPPBPoseList": "Pose List (kppb)",
     "KPPBShotTypeList": "Shot Type List (kppb)",
@@ -123,6 +126,11 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "KPPBActionList": "Action List (kppb)",
     "KPPBGroupActionList": "Group Action List (kppb)",
 }
+
+# ── Optional VLM module (requires numpy + Pillow) ──
+if _vlm_available:
+    NODE_CLASS_MAPPINGS["KPPBVLMRefiner"] = KPPBVLMRefiner
+    NODE_DISPLAY_NAME_MAPPINGS["KPPBVLMRefiner"] = "VLM Prompt Refiner (kppb)"
 
 # ── Optional NSFW module (loaded only when enabled + populated) ──
 if _nsfw_enabled:
