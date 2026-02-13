@@ -138,6 +138,14 @@ Restart ComfyUI. The NSFW module files will be cleaned up automatically and the 
 2. Enable `use_claude_code` on the VLM Prompt Refiner node
 3. Select model (opus, sonnet, or haiku)
 
+## Examples
+
+Example workflows are in the [`examples/`](examples/) folder. Drag and drop the JSON files into ComfyUI to load them.
+
+| Workflow | Description |
+|---|---|
+| [`xy_plot_sfw.json`](examples/xy_plot_sfw.json) | SFW XY Plot batch generation — sweeps outfits and lighting across a grid |
+
 ## Tips
 
 - **Lighting is king** for Klein 9B — the lighting preset has the most impact on output quality
