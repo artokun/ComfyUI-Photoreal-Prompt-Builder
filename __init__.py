@@ -24,57 +24,56 @@ def _nsfw_populated():
     return any(f.endswith(".py") for f in os.listdir(_NSFW_DIR))
 
 
+_NSFW_REPO = "https://github.com/artokun/ComfyUI-Photoreal-Prompt-Builder-NSFW.git"
+
+
+def _is_git_repo():
+    """Check if the node pack was installed as a git repo (clone) vs zip."""
+    return os.path.isdir(os.path.join(_DIR, ".git"))
+
+
 def _fetch_nsfw():
-    """Initialize and fetch the nsfw_pack submodule."""
+    """Fetch the nsfw_pack module. Uses git submodule if available,
+    otherwise falls back to a direct clone (for zip/tarball installs)."""
     try:
-        subprocess.run(
-            ["git", "submodule", "update", "--init", "--", "nsfw_pack"],
-            cwd=_DIR, capture_output=True, timeout=60,
-        )
-        print("[KPPB] NSFW module fetched successfully.")
+        if _is_git_repo():
+            # Git clone install — use submodule
+            subprocess.run(
+                ["git", "submodule", "update", "--init", "--", "nsfw_pack"],
+                cwd=_DIR, capture_output=True, timeout=60,
+            )
+        else:
+            # Zip/tarball install (ComfyUI Manager) — direct clone into nsfw_pack/
+            import shutil
+            if os.path.isdir(_NSFW_DIR):
+                shutil.rmtree(_NSFW_DIR)
+            subprocess.run(
+                ["git", "clone", _NSFW_REPO, "nsfw_pack"],
+                cwd=_DIR, capture_output=True, timeout=60,
+            )
+        if _nsfw_populated():
+            print("[KPPB] NSFW module fetched successfully.")
+        else:
+            print("[KPPB] Warning: NSFW fetch completed but no Python files found.")
     except Exception as e:
-        print(f"[KPPB] Warning: failed to fetch NSFW submodule: {e}")
-
-
-def _pull_nsfw_latest():
-    """Pull latest commits from the nsfw_pack remote."""
-    try:
-        subprocess.run(
-            ["git", "-C", _NSFW_DIR, "checkout", "main"],
-            capture_output=True, timeout=30,
-        )
-        result = subprocess.run(
-            ["git", "-C", _NSFW_DIR, "pull", "origin", "main"],
-            capture_output=True, timeout=60, text=True,
-        )
-        if "Already up to date" not in (result.stdout or ""):
-            print("[KPPB] NSFW module updated to latest.")
-    except Exception as e:
-        print(f"[KPPB] Warning: failed to pull latest NSFW module: {e}")
+        print(f"[KPPB] Warning: failed to fetch NSFW module: {e}")
 
 
 def _clean_nsfw():
-    """Deinit the nsfw_pack submodule and clean the directory."""
+    """Remove nsfw_pack contents. Handles both git submodule and direct clone."""
     try:
-        subprocess.run(
-            ["git", "submodule", "deinit", "-f", "--", "nsfw_pack"],
-            cwd=_DIR, capture_output=True, timeout=30,
-        )
-        # Remove the working tree but keep the .git/modules entry
-        # so re-enabling is fast (just re-init)
         import shutil
+        if _is_git_repo():
+            subprocess.run(
+                ["git", "submodule", "deinit", "-f", "--", "nsfw_pack"],
+                cwd=_DIR, capture_output=True, timeout=30,
+            )
         if os.path.isdir(_NSFW_DIR):
-            for item in os.listdir(_NSFW_DIR):
-                path = os.path.join(_NSFW_DIR, item)
-                if item == ".git":
-                    continue
-                if os.path.isdir(path):
-                    shutil.rmtree(path)
-                else:
-                    os.remove(path)
+            shutil.rmtree(_NSFW_DIR)
+            os.makedirs(_NSFW_DIR, exist_ok=True)
         print("[KPPB] NSFW module cleaned up.")
     except Exception as e:
-        print(f"[KPPB] Warning: failed to clean NSFW submodule: {e}")
+        print(f"[KPPB] Warning: failed to clean NSFW module: {e}")
 
 
 # ── Config-driven NSFW submodule management ──
@@ -84,8 +83,6 @@ _nsfw_enabled = _config.get("nsfw", False)
 if _nsfw_enabled and not _nsfw_populated():
     print("[KPPB] NSFW enabled in config.json but module not found. Fetching...")
     _fetch_nsfw()
-elif _nsfw_enabled and _nsfw_populated():
-    _pull_nsfw_latest()
 elif not _nsfw_enabled and _nsfw_populated():
     print("[KPPB] NSFW disabled in config.json. Cleaning up module...")
     _clean_nsfw()
