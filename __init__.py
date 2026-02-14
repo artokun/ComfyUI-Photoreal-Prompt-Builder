@@ -36,6 +36,23 @@ def _fetch_nsfw():
         print(f"[KPPB] Warning: failed to fetch NSFW submodule: {e}")
 
 
+def _pull_nsfw_latest():
+    """Pull latest commits from the nsfw_pack remote."""
+    try:
+        subprocess.run(
+            ["git", "-C", _NSFW_DIR, "checkout", "main"],
+            capture_output=True, timeout=30,
+        )
+        result = subprocess.run(
+            ["git", "-C", _NSFW_DIR, "pull", "origin", "main"],
+            capture_output=True, timeout=60, text=True,
+        )
+        if "Already up to date" not in (result.stdout or ""):
+            print("[KPPB] NSFW module updated to latest.")
+    except Exception as e:
+        print(f"[KPPB] Warning: failed to pull latest NSFW module: {e}")
+
+
 def _clean_nsfw():
     """Deinit the nsfw_pack submodule and clean the directory."""
     try:
@@ -67,6 +84,8 @@ _nsfw_enabled = _config.get("nsfw", False)
 if _nsfw_enabled and not _nsfw_populated():
     print("[KPPB] NSFW enabled in config.json but module not found. Fetching...")
     _fetch_nsfw()
+elif _nsfw_enabled and _nsfw_populated():
+    _pull_nsfw_latest()
 elif not _nsfw_enabled and _nsfw_populated():
     print("[KPPB] NSFW disabled in config.json. Cleaning up module...")
     _clean_nsfw()
