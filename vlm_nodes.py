@@ -456,6 +456,7 @@ CLAUDE_MODELS = [
 def _find_claude():
     """Find claude binary, checking common install locations beyond PATH.
     Works on macOS, Linux, and Windows."""
+    import os
     import shutil
     import sys
     from pathlib import Path
