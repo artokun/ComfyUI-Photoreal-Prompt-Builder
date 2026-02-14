@@ -572,7 +572,7 @@ class KPPBPromptBuilder:
             "mood": mood,
             "color_grading": _v(color_grading),
             "extra_details": extra_details,
-            "exposure": ", ".join(exposure).lower(),
+            "exposure": ", ".join(exposure).lower() if _NSFW_ENABLED else "",
             "preserve_identity": preserve_identity,
             "negative_prompt": negative_prompt,
         }
