@@ -535,6 +535,34 @@ def _claude_code_chat(system_prompt, user_prompt, model="sonnet", images_b64=Non
 
 
 # ──────────────────────────────────────────────
+# Filename helper
+# ──────────────────────────────────────────────
+
+def _make_filename_prefix(prompt_json="", mode=""):
+    """Build a descriptive filename prefix from scene settings JSON."""
+    parts = []
+    if prompt_json and prompt_json.strip():
+        try:
+            data = json.loads(prompt_json)
+        except (json.JSONDecodeError, TypeError):
+            data = {}
+        # Pick the most descriptive fields
+        for key in ("shot_type", "pose", "scene_type", "lighting_setup", "photo_style"):
+            val = data.get(key, "")
+            if val and val != "as in reference":
+                parts.append(val)
+    if not parts:
+        parts.append(mode.replace(" ", "_") if mode else "img")
+    # Sanitize: lowercase, replace spaces/slashes with underscores, strip non-alnum
+    slug = "_".join(parts)
+    slug = re.sub(r"[^a-z0-9]+", "_", slug.lower()).strip("_")
+    # Truncate to reasonable length
+    if len(slug) > 80:
+        slug = slug[:80].rstrip("_")
+    return slug
+
+
+# ──────────────────────────────────────────────
 # Modes
 # ──────────────────────────────────────────────
 
@@ -592,8 +620,8 @@ class KPPBVLMRefiner:
             },
         }
 
-    RETURN_TYPES = ("STRING", "STRING")
-    RETURN_NAMES = ("refined_prompt", "image_caption")
+    RETURN_TYPES = ("STRING", "STRING", "STRING")
+    RETURN_NAMES = ("refined_prompt", "image_caption", "filename_prefix")
     FUNCTION = "refine"
     CATEGORY = "conditioning/klein"
 
@@ -734,9 +762,11 @@ class KPPBVLMRefiner:
                 if caption and not caption.endswith("."):
                     caption += "."
                 print(f"[KPPB] ═══ DATASET OUTPUT ═══")
+                fname = _make_filename_prefix(prompt_json, mode)
                 print(f"[KPPB] Generation prompt ({len(gen_prompt)} chars): {gen_prompt[:300]}")
                 print(f"[KPPB] Training caption ({len(caption)} chars): {caption[:300]}")
-                return (gen_prompt, caption)
+                print(f"[KPPB] Filename prefix: {fname}")
+                return (gen_prompt, caption, fname)
 
             if result and not result.endswith("."):
                 result += "."
@@ -745,10 +775,11 @@ class KPPBVLMRefiner:
             if preserve_identity:
                 result = result.rstrip(". ") + ". " + IDENTITY_LOCK_PROMPT + "."
 
+            fname = _make_filename_prefix(prompt_json, mode)
             print(f"[KPPB] ═══ FINAL OUTPUT ({len(result)} chars) ═══")
             print(f"[KPPB] {result[:500]}")
             # Claude mode returns same for both outputs (no separate caption stage)
-            return (result, result)
+            return (result, result, fname)
 
         # ════════════════════════════════════════
         # OLLAMA PATH — one-shot VLM compose
@@ -841,7 +872,8 @@ class KPPBVLMRefiner:
         if preserve_identity:
             result = result.rstrip(". ") + ". " + IDENTITY_LOCK_PROMPT + "."
 
+        fname = _make_filename_prefix(prompt_json, mode)
         print(f"[KPPB] ═══ FINAL OUTPUT ({len(result)} chars) ═══")
         print(f"[KPPB] {result[:500]}")
 
-        return (result, result)
+        return (result, result, fname)
