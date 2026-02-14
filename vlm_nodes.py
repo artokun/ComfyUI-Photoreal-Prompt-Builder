@@ -54,7 +54,7 @@ def _extract_from_thinking(thinking):
 
 
 def _ollama_chat(url, model, messages, temperature=0.3,
-                 seed=-1, think=False, label=""):
+                 seed=-1, think=False, label="", format=None):
     """Send a chat completion request to Ollama and return the response text."""
     endpoint = f"{url.rstrip('/')}/api/chat"
 
@@ -69,6 +69,8 @@ def _ollama_chat(url, model, messages, temperature=0.3,
             "repeat_penalty": 1.3,
         },
     }
+    if format is not None:
+        payload["format"] = format
     if seed >= 0:
         payload["options"]["seed"] = seed
 
@@ -391,75 +393,71 @@ Output ONLY the prompt. No labels, no markdown, no quotes."""
 # ──────────────────────────────────────────────
 
 PROSE_SYSTEM_DATASET = """\
-You generate TWO outputs for a character LoRA training dataset pipeline.
+You generate structured JSON for a character LoRA training dataset pipeline.
 
 You receive a reference image of the subject and scene parameters as JSON.
-A separate system (nanobanana / Gemini) will use your first output to generate \
-a photorealistic training image. Your second output becomes the .txt caption \
-paired with that image for Qwen 2512 LoRA training on AI Toolkit.
+A separate image generation model (nanobanana / Gemini) will use the "prompt" \
+field to generate a photorealistic training image. The "caption" field becomes \
+the .txt caption paired with that image for LoRA training.
 
 ─── OUTPUT FORMAT ───
-Respond with EXACTLY two sections separated by the delimiter ---CAPTION---
-No reasoning, no labels, no markdown, no quotes.
+Respond with ONLY a JSON object. No reasoning, no markdown, no code fences.
 
-SECTION 1 (nanobanana generation prompt):
-A detailed natural-language instruction for Gemini to generate a photorealistic \
-image of the EXACT same person from the reference image.
+{
+  "prompt": "<scene description for image generation>",
+  "caption": "<LoRA training caption>"
+}
 
-CRITICAL IDENTITY RULES for Section 1:
-- ALWAYS open with: "Generate a photorealistic photo of the exact same person \
-from the reference image"
-- ALWAYS close with the FULL identity lock paragraph (see below)
-- NEVER describe or mention the subject's eye color, face shape, skin tone, \
-hair color (unless the settings explicitly override hair). Describing these \
-features causes Gemini to OVERRIDE the reference and invent new features.
-- The reference image is the SOLE source of identity. Your text must only \
-describe the SCENE, not the PERSON.
+─── PROMPT FIELD RULES ───
+Write a pure SCENE DESCRIPTION — NOT an instruction. The image generator \
+receives this as a text prompt alongside the reference image.
 
-After the opening line, describe ONLY the scene parameters from settings:
-1. Pose/action
-2. Outfit
-3. Environment/scene — be specific with atmosphere details
-4. Lighting — be vivid and cinematic, this drives realism
-5. Camera framing, lens, depth of field
-6. Mood and color grading
-7. Hairstyle ONLY if settings override it (non-empty)
+DO: "A photorealistic photo of the woman from the reference, standing..."
+DON'T: "Generate a photorealistic photo..." (causes the model to reason \
+about the task instead of generating)
 
-MANDATORY CLOSING (include VERBATIM at the end of every prompt):
-"The subject must be the exact same person from the reference image. \
-Maintain identical facial structure, bone structure, exact eye color, \
-exact eye shape, nose shape, lip shape, jawline, skin tone, body type, \
-body proportions, breast size and shape, and all identifying marks. \
-Do not change, idealize, or reinterpret any physical feature."
+CRITICAL IDENTITY RULES:
+- NEVER describe the subject's eye color, face shape, skin tone, hair color \
+(unless settings explicitly override hair). Describing physical features \
+causes the generator to OVERRIDE the reference and invent new features.
+- The reference image is the SOLE source of identity. Your text describes \
+only the SCENE, not the PERSON.
 
-SECTION 2 (LoRA training caption — after ---CAPTION---):
-A 1-3 sentence natural-language caption for the .txt file. Rules:
+Structure the prompt as one flowing paragraph:
+1. Opening: "A photorealistic photo of the woman from the reference"
+2. Pose/action from settings
+3. Outfit from settings
+4. Environment/scene — be specific with atmosphere
+5. Lighting — vivid and cinematic, this drives realism
+6. Camera framing, lens, depth of field
+7. Mood and color grading
+8. Closing: "Maintain exact likeness, body proportions, and all identifying \
+features from the reference."
+
+─── CAPTION FIELD RULES ───
+A 1-3 sentence natural-language caption for the .txt file:
 - Start with: [trigger]
 - Describe ONLY what varies: pose, outfit, lighting, background, expression, \
 camera framing, mood
-- NEVER describe the subject's permanent physical features (face shape, \
-eye color, skin tone, body type, height) — the model learns these implicitly \
-from the images and ties them to the trigger word
-- Use clear flowing prose — no bullet points, no keywords, no markdown
-- Keep it concise — the model learns better from clean, focused captions
+- NEVER describe permanent physical features (face, eyes, skin, body type) — \
+the model learns these from images tied to the trigger word
+- Use clear flowing prose, concise and focused
 
 ─── EXAMPLE OUTPUT ───
-Generate a photorealistic photo of the exact same person from the reference \
-image, standing with one hand on hip wearing a white oversized t-shirt and \
+{
+  "prompt": "A photorealistic photo of the woman from the reference, \
+standing with one hand on hip wearing a white oversized t-shirt and \
 denim shorts. Set in a cozy cafe with warm wood tones and soft ambient \
-lighting. Golden hour sunlight streams through a large window casting warm \
-amber tones and gentle shadows across the scene. Waist-up portrait framed \
-at 85mm with shallow depth of field softly blurring the background. Casual \
-relaxed mood with natural warm color grading. The subject must be the exact \
-same person from the reference image. Maintain identical facial structure, \
-bone structure, exact eye color, exact eye shape, nose shape, lip shape, \
-jawline, skin tone, body type, body proportions, breast size and shape, \
-and all identifying marks. Do not change, idealize, or reinterpret any \
-physical feature.
----CAPTION---
-[trigger], standing with one hand on hip wearing a white oversized t-shirt \
-and denim shorts, golden hour sunlight streaming through a cafe window, \
-warm amber tones, waist-up portrait shot at 85mm with shallow depth of field."""
+lighting. Golden hour sunlight streams through a large window casting \
+warm amber tones and gentle shadows across the scene. Waist-up portrait \
+framed at 85mm with shallow depth of field softly blurring the background. \
+Casual relaxed mood with natural warm color grading. Maintain exact \
+likeness, body proportions, and all identifying features from the reference.",
+  "caption": "[trigger], standing with one hand on hip wearing a white \
+oversized t-shirt and denim shorts, golden hour sunlight streaming through \
+a cafe window, warm amber tones, waist-up portrait shot at 85mm with \
+shallow depth of field."
+}"""
 
 
 # ──────────────────────────────────────────────
@@ -601,6 +599,51 @@ def _claude_code_chat(system_prompt, user_prompt, model="sonnet", images_b64=Non
                 os.unlink(tf)
             except OSError:
                 pass
+
+
+# ──────────────────────────────────────────────
+# Dataset JSON parser
+# ──────────────────────────────────────────────
+
+def _parse_dataset_json(text, trigger_word="ohwx"):
+    """Parse structured dataset output (JSON or delimiter fallback).
+    Returns (gen_prompt, caption) or (None, None) if parsing fails."""
+    text = text.strip()
+
+    # Strip markdown code fences if present
+    if text.startswith("```"):
+        lines = text.split("\n")
+        lines = [l for l in lines if not l.strip().startswith("```")]
+        text = "\n".join(lines).strip()
+
+    # Try JSON first
+    try:
+        data = json.loads(text)
+        gen_prompt = data.get("prompt", "").strip()
+        caption = data.get("caption", "").strip()
+        if gen_prompt:
+            caption = caption.replace("[trigger]", trigger_word)
+            if not gen_prompt.endswith("."):
+                gen_prompt += "."
+            if caption and not caption.endswith("."):
+                caption += "."
+            return (gen_prompt, caption)
+    except (json.JSONDecodeError, TypeError, AttributeError):
+        pass
+
+    # Fallback: try ---CAPTION--- delimiter (backwards compat)
+    if "---CAPTION---" in text:
+        parts = text.split("---CAPTION---", 1)
+        gen_prompt = parts[0].strip()
+        caption = parts[1].strip()
+        caption = caption.replace("[trigger]", trigger_word)
+        if gen_prompt and not gen_prompt.endswith("."):
+            gen_prompt += "."
+        if caption and not caption.endswith("."):
+            caption += "."
+        return (gen_prompt, caption)
+
+    return (None, None)
 
 
 # ──────────────────────────────────────────────
@@ -819,23 +862,16 @@ class KPPBVLMRefiner:
                 else:
                     result = "photorealistic portrait."
 
-            # ── Dataset generation: split into prompt + caption ──
-            if mode == "dataset generation" and "---CAPTION---" in result:
-                parts_split = result.split("---CAPTION---", 1)
-                gen_prompt = parts_split[0].strip()
-                caption = parts_split[1].strip()
-                # Replace [trigger] placeholder with actual trigger word
-                caption = caption.replace("[trigger]", trigger_word)
-                if gen_prompt and not gen_prompt.endswith("."):
-                    gen_prompt += "."
-                if caption and not caption.endswith("."):
-                    caption += "."
-                print(f"[KPPB] ═══ DATASET OUTPUT ═══")
-                fname = _make_filename_prefix(prompt_json, mode)
-                print(f"[KPPB] Generation prompt ({len(gen_prompt)} chars): {gen_prompt[:300]}")
-                print(f"[KPPB] Training caption ({len(caption)} chars): {caption[:300]}")
-                print(f"[KPPB] Filename prefix: {fname}")
-                return (gen_prompt, caption, fname)
+            # ── Dataset generation: parse JSON with prompt + caption ──
+            if mode == "dataset generation":
+                gen_prompt, caption = _parse_dataset_json(result, trigger_word)
+                if gen_prompt:
+                    fname = _make_filename_prefix(prompt_json, mode)
+                    print(f"[KPPB] ═══ DATASET OUTPUT ═══")
+                    print(f"[KPPB] Generation prompt ({len(gen_prompt)} chars): {gen_prompt[:300]}")
+                    print(f"[KPPB] Training caption ({len(caption)} chars): {caption[:300]}")
+                    print(f"[KPPB] Filename prefix: {fname}")
+                    return (gen_prompt, caption, fname)
 
             if result and not result.endswith("."):
                 result += "."
@@ -859,12 +895,15 @@ class KPPBVLMRefiner:
         print(f"[KPPB] mode={mode}, scene={has_scene}, prop={has_prop}, model={model}")
 
         # ── Select system prompt by mode ──
+        is_dataset = mode == "dataset generation"
         if system_prompt and system_prompt.strip():
             sys_prompt = system_prompt.strip()
         elif mode == "describe & enhance":
             sys_prompt = VLM_SYSTEM
         elif mode == "image edit aware":
             sys_prompt = VLM_SYSTEM_EDIT
+        elif is_dataset:
+            sys_prompt = PROSE_SYSTEM_DATASET
         else:
             sys_prompt = VLM_SYSTEM_CAPTION
 
@@ -893,6 +932,15 @@ class KPPBVLMRefiner:
                 parts.append(f"SCENE SETTINGS:\n{prompt_json.strip()}")
             parts.append("Write the Klein 9B prompt describing the final result.")
 
+        elif is_dataset:
+            if prompt_json and prompt_json.strip():
+                parts.append(f"SCENE SETTINGS:\n{prompt_json.strip()}")
+            parts.append(f"TRIGGER WORD: {trigger_word}")
+            parts.append(
+                "Generate the JSON with prompt and caption fields. "
+                "Use [trigger] as placeholder in the caption."
+            )
+
         else:  # caption only
             parts.append("Write the Klein 9B prompt describing this image.")
 
@@ -910,6 +958,7 @@ class KPPBVLMRefiner:
             seed=seed,
             think=False,
             label="VLM",
+            format="json" if is_dataset else None,
         )
 
         # ── Unload model from VRAM if requested ──
@@ -924,6 +973,19 @@ class KPPBVLMRefiner:
             lines = result.split("\n")
             lines = [l for l in lines if not l.strip().startswith("```")]
             result = "\n".join(lines).strip()
+
+        # ── Dataset mode: parse JSON ──
+        if is_dataset:
+            gen_prompt, caption = _parse_dataset_json(result, trigger_word)
+            if gen_prompt:
+                fname = _make_filename_prefix(prompt_json, mode)
+                print(f"[KPPB] ═══ DATASET OUTPUT ═══")
+                print(f"[KPPB] Generation prompt ({len(gen_prompt)} chars): {gen_prompt[:300]}")
+                print(f"[KPPB] Training caption ({len(caption)} chars): {caption[:300]}")
+                print(f"[KPPB] Filename prefix: {fname}")
+                return (gen_prompt, caption, fname)
+            # Fallback if JSON parse failed
+            print(f"[KPPB] Warning: dataset JSON parse failed, using raw output")
 
         if result and not result.endswith("."):
             result += "."
