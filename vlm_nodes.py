@@ -760,12 +760,16 @@ _POSE_MOTION = {
 }
 
 
-def _build_video_prompt(prompt_json="", motion_prompt=""):
+def _build_video_prompt(prompt_json="", motion_prompt="", audio_prompt=""):
     """Build a Wan 2.6 I2V motion prompt from scene data.
-    Priority: motion_prompt override > action > pose motion > scene ambient."""
-    # 1. Direct override
+    Priority: motion_prompt override > action > pose motion > scene ambient.
+    Audio prompt is appended when provided."""
+    # 1. Direct motion override
     if motion_prompt and motion_prompt.strip():
-        return motion_prompt.strip()
+        result = motion_prompt.strip()
+        if audio_prompt and audio_prompt.strip():
+            result += f" Audio: {audio_prompt.strip()}"
+        return result
 
     # 2. Parse scene data
     data = {}
@@ -813,7 +817,11 @@ def _build_video_prompt(prompt_json="", motion_prompt=""):
     # Combine and deduplicate
     combined = ", ".join(parts)
     # Prefix with cinematic camera feel
-    return f"Smooth cinematic motion. {combined}. Camera holds steady with subtle drift."
+    result = f"Smooth cinematic motion. {combined}. Camera holds steady with subtle drift."
+    # Append audio description
+    if audio_prompt and audio_prompt.strip():
+        result += f" Audio: {audio_prompt.strip()}"
+    return result
 
 
 # ──────────────────────────────────────────────
@@ -877,6 +885,8 @@ class KPPBVLMRefiner:
                                                        "tooltip": "Generate a Wan 2.6 I2V motion prompt from the scene settings. Turn off to save LLM overhead on smaller models."}),
                 "motion_prompt": ("STRING", {"multiline": True, "default": "",
                                              "placeholder": "Override video motion (e.g. 'slowly turns head, hair flowing in wind')"}),
+                "audio_prompt": ("STRING", {"multiline": True, "default": "",
+                                            "placeholder": "Audio: speech, tone, background sounds (e.g. 'She whispers \"Hey there\" softly, cafe ambience, gentle jazz')"}),
             },
         }
 
@@ -907,6 +917,7 @@ class KPPBVLMRefiner:
         sfw_prompt=False,
         generate_video_prompt=False,
         motion_prompt="",
+        audio_prompt="",
     ):
         # ── Encode all images to base64 (needed by both paths) ──
         images_b64 = []
@@ -933,7 +944,7 @@ class KPPBVLMRefiner:
         # ── Build video prompt (deterministic, no LLM call) ──
         vid_prompt = ""
         if generate_video_prompt:
-            vid_prompt = _build_video_prompt(prompt_json, motion_prompt)
+            vid_prompt = _build_video_prompt(prompt_json, motion_prompt, audio_prompt)
             print(f"[KPPB] Video prompt ({len(vid_prompt)} chars): {vid_prompt[:200]}")
 
         # ════════════════════════════════════════
