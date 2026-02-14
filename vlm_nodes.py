@@ -538,6 +538,7 @@ def _claude_code_chat(system_prompt, user_prompt, model="sonnet", images_b64=Non
         "--model", model,
         "--output-format", "text",
         "--max-turns", "1",
+        "--dangerously-skip-permissions",
     ]
 
     print(f"[KPPB:CLAUDE] Calling Claude Code CLI (model={model}, images={len(images_b64 or [])})...")
@@ -548,7 +549,7 @@ def _claude_code_chat(system_prompt, user_prompt, model="sonnet", images_b64=Non
             cmd,
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=300,
         )
 
         if result.returncode != 0:
@@ -563,7 +564,7 @@ def _claude_code_chat(system_prompt, user_prompt, model="sonnet", images_b64=Non
         return content
 
     except subprocess.TimeoutExpired:
-        raise RuntimeError("Claude Code CLI timed out after 120s")
+        raise RuntimeError("Claude Code CLI timed out after 300s")
     except FileNotFoundError:
         raise RuntimeError("Claude Code CLI not found on PATH")
     finally:
