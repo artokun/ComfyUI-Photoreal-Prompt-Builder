@@ -453,20 +453,37 @@ CLAUDE_MODELS = [
 ]
 
 
+def _find_claude():
+    """Find claude binary, checking common install locations beyond PATH."""
+    import shutil
+    found = shutil.which("claude")
+    if found:
+        return found
+    # ComfyUI often runs with a restricted PATH — check common locations
+    home = os.path.expanduser("~")
+    candidates = [
+        os.path.join(home, ".local", "bin", "claude"),
+        os.path.join(home, ".npm-global", "bin", "claude"),
+        "/usr/local/bin/claude",
+        "/opt/homebrew/bin/claude",
+    ]
+    for path in candidates:
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+    return None
+
+
 def _claude_code_available():
     """Check if Claude Code CLI is installed."""
-    import shutil
-    return shutil.which("claude") is not None
+    return _find_claude() is not None
 
 
 def _claude_code_chat(system_prompt, user_prompt, model="sonnet", images_b64=None):
     """Call Claude Code CLI. Supports text and image inputs. Returns response text."""
     import subprocess
-    import shutil
     import tempfile
-    import os
 
-    claude_path = shutil.which("claude")
+    claude_path = _find_claude()
     if not claude_path:
         raise RuntimeError(
             "Claude Code CLI not found. Install it or disable 'use_claude_code'.\n"
