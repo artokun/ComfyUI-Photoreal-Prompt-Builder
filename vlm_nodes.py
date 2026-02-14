@@ -743,8 +743,12 @@ Embed camera directions naturally (zoom in, pan, track, hold steady). \
 Include the subject's movements, expressions, gestures, and any physical \
 motion (hair, fabric, breathing). Write it as if directing a single \
 continuous take.
-3. CLOSING — anchor continuity: "Ensure smooth transitions, stable \
-identity, and soft enveloping light throughout."
+3. CLOSING — anchor continuity and identity. End EVERY video prompt with: \
+"Ensure smooth transitions, stable identity, and soft enveloping light \
+throughout. Maintain exact likeness, identical facial structure, bone \
+structure, eye shape, eye color, nose, lips, jawline, skin tone, breast \
+size and shape, body proportions, and all identifying marks from the \
+reference throughout the entire sequence."
 
 RULES:
 - This is ONE continuous scene, NOT multiple cuts or scenes
