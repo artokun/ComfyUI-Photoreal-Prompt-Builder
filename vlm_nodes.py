@@ -684,20 +684,35 @@ def _make_filename_prefix(prompt_json="", mode=""):
 
 SFW_INSTRUCTION = """
 
-─── CONTENT SAFETY ───
-The output prompt will be sent to a hosted image generation model with strict \
-content safety filters (Google Gemini). You MUST transform any suggestive, \
-revealing, or potentially prohibited content so that it passes these filters:
-- Replace revealing outfits with stylish but modest alternatives \
-(e.g. "sheer blouse" → "silk blouse", "micro skirt" → "mini skirt", \
-"lingerie" → omit or replace with casual loungewear)
-- Replace "without top/bottom/shoes" removal instructions with a \
-covered alternative instead
-- Avoid any language implying nudity, undressing, or sexual posing
-- Keep poses natural and non-suggestive
-- The scene should read as a fashion editorial or lifestyle photo
-Do NOT mention that you are softening or filtering — just write the \
-clean version directly."""
+─── CONTENT SAFETY (MANDATORY) ───
+The output prompt will be sent to Google Gemini which has STRICT content \
+safety filters. Prompts that violate these filters are rejected entirely. \
+You MUST rewrite the scene so it passes. This is non-negotiable.
+
+PROHIBITED — Gemini will REJECT prompts containing ANY of these:
+- Underwear/lingerie as visible clothing: bra, panties, thong, g-string, \
+bodysuit, corset, garter, stockings, bralette, teddy, babydoll — replace \
+with real outerwear (tank top, camisole, blouse, dress, etc.)
+- Sheer/see-through/mesh clothing that implies visible skin or underwear
+- "Without top", "without bottom", "without bra" or any removal of \
+covering — replace with a clothed alternative instead
+- Suggestive poses combined with revealing clothing: blowing kisses, \
+bending over, arching back, spreading legs, pulling at clothing
+- Explicitly sexual poses, gestures, or facial expressions
+- Any mention of nudity, partial nudity, or undressing
+
+TRANSFORMATION RULES:
+1. Lingerie items → swap to the nearest fashionable outerwear \
+(bra → fitted top, panties → shorts, corset → structured crop top, \
+stockings → tights or boots, bodysuit → fitted dress)
+2. "Open" or "unbuttoned" clothing → "casually draped" or just remove \
+the modifier
+3. Suggestive poses → natural confident poses (hand on hip, walking, \
+leaning against wall, looking over shoulder)
+4. Keep the same ENERGY and STYLE of the scene — just make it read as \
+a fashion editorial or lifestyle photo, not a lingerie shoot
+
+Write the clean version directly. Do NOT mention filtering or safety."""
 
 
 # ──────────────────────────────────────────────
