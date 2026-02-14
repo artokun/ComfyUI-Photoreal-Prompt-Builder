@@ -28,11 +28,14 @@ _REF = "as in reference"
 _RND = "random"
 
 
+_SKIP_RANDOM = {_REF, _RND, "custom", "unset", "remove"}
+
+
 def _resolve_random(value, options):
-    """If value is 'random', pick a random concrete option (skip ref/random/custom)."""
+    """If value is 'random', pick a random concrete option (skip meta values)."""
     if value != _RND:
         return value
-    concrete = [v for v in options if v not in (_REF, _RND, "custom")]
+    concrete = [v for v in options if v not in _SKIP_RANDOM]
     return random.choice(concrete) if concrete else _REF
 
 
@@ -620,9 +623,10 @@ class KPPBPromptBuilder:
 # OUTFIT COMPOSER
 # ══════════════════════════════════════════════
 
-_NONE = "none"
+_UNSET = "unset"
+_REMOVE = "remove"
 
-TOPS = [_NONE] + sorted([
+TOPS = [_UNSET, _RND, _REMOVE] + sorted([
     "T-shirt", "Tank top", "Crop top", "Hoodie", "Sweater", "Blouse",
     "Bodysuit", "Bustier", "Corset", "Corset top", "Lace camisole",
     "Satin camisole", "Sheer blouse", "Chiffon blouse", "Mesh top",
@@ -634,7 +638,7 @@ TOPS = [_NONE] + sorted([
     "Gothic lace top", "Harness top",
 ])
 
-BOTTOMS = [_NONE] + sorted([
+BOTTOMS = [_UNSET, _RND, _REMOVE] + sorted([
     "Jeans", "Shorts", "Skirt", "Leggings", "Joggers", "Cargo pants",
     "Mini skirt", "Maxi skirt", "Slacks", "Denim skirt", "Micro skirt",
     "Pleated skirt", "Tennis skirt", "Pencil skirt", "Wrap skirt",
@@ -646,7 +650,7 @@ BOTTOMS = [_NONE] + sorted([
     "Yoga pants", "Fishnet leggings", "Suspender skirt",
 ])
 
-LINGERIE_TOPS = [_NONE] + sorted([
+LINGERIE_TOPS = [_UNSET, _RND, _REMOVE] + sorted([
     "Bralette", "Lace bralette", "Satin bra", "Push-up bra",
     "Balconette bra", "Plunge bra", "Strapless bra", "Triangle bra",
     "Sheer bra", "Lace bra", "Longline bra", "Cage bra", "Harness bra",
@@ -654,7 +658,7 @@ LINGERIE_TOPS = [_NONE] + sorted([
     "Babydoll top", "Teddy lingerie",
 ])
 
-LINGERIE_BOTTOMS = [_NONE] + sorted([
+LINGERIE_BOTTOMS = [_UNSET, _RND, _REMOVE] + sorted([
     "Lace panties", "Thong", "G-string", "Bikini briefs",
     "Cheeky briefs", "High-waisted panties", "Satin panties",
     "Sheer panties", "Strappy panties", "Garter belt",
@@ -663,7 +667,7 @@ LINGERIE_BOTTOMS = [_NONE] + sorted([
     "Bodystocking", "Sheer tights", "Fishnet tights",
 ])
 
-OUTERWEAR = [_NONE] + sorted([
+OUTERWEAR = [_UNSET, _RND, _REMOVE] + sorted([
     "Trench coat", "Wool coat", "Long coat", "Peacoat", "Puffer jacket",
     "Parka", "Bomber jacket", "Denim jacket", "Leather jacket",
     "Moto jacket", "Blazer", "Oversized blazer", "Cardigan",
@@ -673,7 +677,7 @@ OUTERWEAR = [_NONE] + sorted([
     "Satin robe",
 ])
 
-SHOES = [_NONE] + sorted([
+SHOES = [_UNSET, _RND, _REMOVE] + sorted([
     "Sneakers", "Boots", "Heels", "Platform shoes", "Sandals", "Flats",
     "Strappy heels", "Stilettos", "Pumps", "Wedges", "Ankle boots",
     "Knee-high boots", "Thigh-high boots", "Combat boots",
@@ -683,7 +687,7 @@ SHOES = [_NONE] + sorted([
     "Lace-up heels", "Thigh-high heeled boots", "Barefoot",
 ])
 
-ACCESSORIES = [_NONE] + sorted([
+ACCESSORIES = [_UNSET, _RND, _REMOVE] + sorted([
     "Belt", "Chain belt", "Sunglasses", "Eyeglasses", "Beanie",
     "Baseball cap", "Handbag", "Backpack", "Headphones", "Watch",
     "Choker", "Leather choker", "Spiked choker", "Body harness",
@@ -703,17 +707,17 @@ class KPPBOutfitComposer:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "top": (TOPS, {"default": _NONE}),
-                "bottom": (BOTTOMS, {"default": _NONE}),
-                "shoes": (SHOES, {"default": _NONE}),
+                "top": (TOPS, {"default": _UNSET}),
+                "bottom": (BOTTOMS, {"default": _UNSET}),
+                "shoes": (SHOES, {"default": _UNSET}),
             },
             "optional": {
-                "lingerie_top": (LINGERIE_TOPS, {"default": _NONE}),
-                "lingerie_bottom": (LINGERIE_BOTTOMS, {"default": _NONE}),
-                "outerwear": (OUTERWEAR, {"default": _NONE}),
-                "accessory_1": (ACCESSORIES, {"default": _NONE}),
-                "accessory_2": (ACCESSORIES, {"default": _NONE}),
-                "accessory_3": (ACCESSORIES, {"default": _NONE}),
+                "lingerie_top": (LINGERIE_TOPS, {"default": _UNSET}),
+                "lingerie_bottom": (LINGERIE_BOTTOMS, {"default": _UNSET}),
+                "outerwear": (OUTERWEAR, {"default": _UNSET}),
+                "accessory_1": (ACCESSORIES, {"default": _UNSET}),
+                "accessory_2": (ACCESSORIES, {"default": _UNSET}),
+                "accessory_3": (ACCESSORIES, {"default": _UNSET}),
                 "extra_outfit_details": ("STRING", {"multiline": True, "default": ""}),
             },
         }
@@ -725,32 +729,53 @@ class KPPBOutfitComposer:
 
     def compose_outfit(
         self,
-        top=_NONE,
-        bottom=_NONE,
-        shoes=_NONE,
-        lingerie_top=_NONE,
-        lingerie_bottom=_NONE,
-        outerwear=_NONE,
-        accessory_1=_NONE,
-        accessory_2=_NONE,
-        accessory_3=_NONE,
+        top=_UNSET,
+        bottom=_UNSET,
+        shoes=_UNSET,
+        lingerie_top=_UNSET,
+        lingerie_bottom=_UNSET,
+        outerwear=_UNSET,
+        accessory_1=_UNSET,
+        accessory_2=_UNSET,
+        accessory_3=_UNSET,
         extra_outfit_details="",
     ):
-        pieces = []
+        # Resolve random selections
+        top = _resolve_random(top, TOPS)
+        bottom = _resolve_random(bottom, BOTTOMS)
+        shoes = _resolve_random(shoes, SHOES)
+        lingerie_top = _resolve_random(lingerie_top, LINGERIE_TOPS)
+        lingerie_bottom = _resolve_random(lingerie_bottom, LINGERIE_BOTTOMS)
+        outerwear = _resolve_random(outerwear, OUTERWEAR)
+        accessory_1 = _resolve_random(accessory_1, ACCESSORIES)
+        accessory_2 = _resolve_random(accessory_2, ACCESSORIES)
+        accessory_3 = _resolve_random(accessory_3, ACCESSORIES)
 
-        # Gather all non-none selections
-        for item in [lingerie_top, lingerie_bottom, top, bottom, outerwear, shoes]:
-            if item and item != _NONE:
+        pieces = []
+        removed = []
+        _skip = {_UNSET, _REMOVE, _RND}
+
+        # Gather clothing pieces, track removals
+        for label, item in [
+            ("lingerie top", lingerie_top), ("lingerie bottom", lingerie_bottom),
+            ("top", top), ("bottom", bottom),
+            ("outerwear", outerwear), ("shoes", shoes),
+        ]:
+            if item == _REMOVE:
+                removed.append(label)
+            elif item and item not in _skip:
                 pieces.append(item.lower())
 
         # Accessories
         seen_acc = set()
         for item in [accessory_1, accessory_2, accessory_3]:
-            if item and item != _NONE and item.lower() not in seen_acc:
+            if item == _REMOVE:
+                continue
+            if item and item not in _skip and item.lower() not in seen_acc:
                 pieces.append(item.lower())
                 seen_acc.add(item.lower())
 
-        if not pieces and not (extra_outfit_details and extra_outfit_details.strip()):
+        if not pieces and not removed and not (extra_outfit_details and extra_outfit_details.strip()):
             return ("",)
 
         # Build natural prose
@@ -763,6 +788,14 @@ class KPPBOutfitComposer:
                 outfit_str = f"Wearing {', '.join(pieces[:-1])}, and {pieces[-1]}"
         else:
             outfit_str = ""
+
+        # Append removal instructions
+        if removed:
+            no_str = "No " + ", no ".join(removed)
+            if outfit_str:
+                outfit_str = f"{outfit_str}. {no_str}"
+            else:
+                outfit_str = no_str
 
         if extra_outfit_details and extra_outfit_details.strip():
             extra = extra_outfit_details.strip()
