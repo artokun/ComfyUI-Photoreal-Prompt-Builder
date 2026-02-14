@@ -454,22 +454,44 @@ CLAUDE_MODELS = [
 
 
 def _find_claude():
-    """Find claude binary, checking common install locations beyond PATH."""
+    """Find claude binary, checking common install locations beyond PATH.
+    Works on macOS, Linux, and Windows."""
     import shutil
+    import sys
+    from pathlib import Path
+
+    # Try PATH first (handles most cases where PATH is complete)
     found = shutil.which("claude")
     if found:
         return found
-    # ComfyUI often runs with a restricted PATH — check common locations
-    home = os.path.expanduser("~")
-    candidates = [
-        os.path.join(home, ".local", "bin", "claude"),
-        os.path.join(home, ".npm-global", "bin", "claude"),
-        "/usr/local/bin/claude",
-        "/opt/homebrew/bin/claude",
-    ]
+
+    home = Path.home()
+    is_win = sys.platform == "win32"
+
+    if is_win:
+        # Windows: npm global installs to %APPDATA%\npm
+        appdata = os.environ.get("APPDATA", "")
+        localappdata = os.environ.get("LOCALAPPDATA", "")
+        candidates = []
+        if appdata:
+            candidates.append(Path(appdata) / "npm" / "claude.cmd")
+        if localappdata:
+            candidates.append(Path(localappdata) / "Programs" / "claude" / "claude.exe")
+            candidates.append(Path(localappdata) / "fnm_multishells" / "claude.cmd")
+        candidates.append(home / ".local" / "bin" / "claude.cmd")
+        candidates.append(home / ".local" / "bin" / "claude.exe")
+    else:
+        # macOS / Linux
+        candidates = [
+            home / ".local" / "bin" / "claude",
+            home / ".npm-global" / "bin" / "claude",
+            Path("/usr/local/bin/claude"),
+            Path("/opt/homebrew/bin/claude"),
+        ]
+
     for path in candidates:
-        if os.path.isfile(path) and os.access(path, os.X_OK):
-            return path
+        if path.is_file() and os.access(path, os.X_OK):
+            return str(path)
     return None
 
 
