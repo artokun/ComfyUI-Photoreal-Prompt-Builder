@@ -716,6 +716,107 @@ Write the clean version directly. Do NOT mention filtering or safety."""
 
 
 # ──────────────────────────────────────────────
+# Video prompt builder (Wan 2.6 I2V)
+# ──────────────────────────────────────────────
+
+# Ambient motion fallbacks keyed by scene type
+_SCENE_AMBIENT = {
+    "bedroom": "soft curtain sway, gentle breathing, warm light flicker",
+    "bathroom": "steam drifting slowly, water droplets on glass, soft mirror reflection shimmer",
+    "living room": "gentle ambient light shift, soft fabric settling, dust motes in sunlight",
+    "kitchen": "steam rising, warm light shifting, subtle cabinet reflection",
+    "hotel room": "curtain billowing softly, city light glow shifting, ambient settling",
+    "urban street": "distant traffic passing, neon signs flickering, gentle wind in hair",
+    "cafe": "steam curling from a cup, warm ambient light shift, soft background chatter motion",
+    "bar/club": "neon light pulse, ambient haze drifting, colored light sweep",
+    "rooftop": "hair gently blowing in wind, city lights twinkling below, soft cloud drift",
+    "beach": "hair and fabric flowing in ocean breeze, waves rolling in background, warm light shimmer",
+    "pool": "water surface rippling, light reflections dancing, gentle poolside breeze",
+    "park": "leaves rustling, dappled sunlight shifting through trees, gentle breeze in hair",
+    "gym": "subtle breathing motion, ambient gym activity, fluorescent light hum",
+    "studio": "subtle posing micro-movements, soft studio light adjustment, gentle hair settle",
+    "balcony": "gentle breeze, hair swaying softly, distant city ambience",
+    "car": "passing streetlights casting moving shadows, subtle engine vibration, dashboard glow",
+    "stairwell": "overhead light flicker, subtle shadow shift, ambient echo feeling",
+    "hallway/corridor": "distant footsteps echo, overhead light flicker, gentle perspective shift",
+}
+
+# Motion mappings from common poses
+_POSE_MOTION = {
+    "standing": "subtle weight shift, gentle breathing motion",
+    "sitting": "gentle posture adjustment, soft hand gesture",
+    "walking": "confident stride forward, arms swinging naturally, hair bouncing with each step",
+    "leaning": "gentle weight shift against surface, relaxed breathing",
+    "crouching": "slow rise or gentle rocking motion",
+    "lying down": "soft breathing, gentle body settle",
+    "kneeling": "subtle posture sway, gentle head tilt",
+    "reclining": "gentle breathing, soft arm adjustment",
+    "dancing": "fluid rhythmic movement, spinning or swaying to music, fabric flowing with motion",
+    "jumping": "dynamic upward motion, hair floating, fabric catching air",
+    "running": "athletic forward motion, hair streaming back, arms pumping",
+    "stretching": "slow fluid extension, deep breathing visible, graceful movement",
+    "twisting": "slow rotation of torso, hair following the turn",
+    "bending": "smooth downward arc, hair falling forward",
+}
+
+
+def _build_video_prompt(prompt_json="", motion_prompt=""):
+    """Build a Wan 2.6 I2V motion prompt from scene data.
+    Priority: motion_prompt override > action > pose motion > scene ambient."""
+    # 1. Direct override
+    if motion_prompt and motion_prompt.strip():
+        return motion_prompt.strip()
+
+    # 2. Parse scene data
+    data = {}
+    if prompt_json and prompt_json.strip():
+        try:
+            data = json.loads(prompt_json)
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    parts = []
+
+    # 3. Action field — the strongest motion signal
+    action = data.get("action", "").strip()
+    if action:
+        parts.append(action)
+
+    # 4. Pose-derived motion
+    pose = data.get("pose", "").strip().lower()
+    if pose:
+        for key, motion in _POSE_MOTION.items():
+            if key in pose:
+                parts.append(motion)
+                break
+
+    # 5. Scene ambient motion
+    scene = data.get("scene_type", "").strip().lower()
+    if scene and scene in _SCENE_AMBIENT:
+        parts.append(_SCENE_AMBIENT[scene])
+
+    # 6. Lighting-derived motion
+    lighting = data.get("lighting_setup", "").strip().lower()
+    if "golden hour" in lighting:
+        parts.append("warm golden light slowly shifting")
+    elif "neon" in lighting:
+        parts.append("neon colors pulsing and reflecting")
+    elif "candlelight" in lighting:
+        parts.append("candlelight flickering, warm shadows dancing")
+    elif "backlit" in lighting:
+        parts.append("sun flare gently shifting")
+
+    if not parts:
+        # Ultimate fallback — subtle ambient
+        parts.append("subtle natural movement, gentle breathing, soft ambient light shift")
+
+    # Combine and deduplicate
+    combined = ", ".join(parts)
+    # Prefix with cinematic camera feel
+    return f"Smooth cinematic motion. {combined}. Camera holds steady with subtle drift."
+
+
+# ──────────────────────────────────────────────
 # Modes
 # ──────────────────────────────────────────────
 
@@ -772,11 +873,15 @@ class KPPBVLMRefiner:
                                             "tooltip": "Trigger word for LoRA training captions (dataset generation mode only)"}),
                 "sfw_prompt": ("BOOLEAN", {"default": False,
                                            "tooltip": "Soften the output prompt to pass content safety filters on hosted models like nanobanana/Gemini. Leave off for local models."}),
+                "generate_video_prompt": ("BOOLEAN", {"default": False,
+                                                       "tooltip": "Generate a Wan 2.6 I2V motion prompt from the scene settings. Turn off to save LLM overhead on smaller models."}),
+                "motion_prompt": ("STRING", {"multiline": True, "default": "",
+                                             "placeholder": "Override video motion (e.g. 'slowly turns head, hair flowing in wind')"}),
             },
         }
 
-    RETURN_TYPES = ("STRING", "STRING", "STRING")
-    RETURN_NAMES = ("refined_prompt", "image_caption", "filename_prefix")
+    RETURN_TYPES = ("STRING", "STRING", "STRING", "STRING")
+    RETURN_NAMES = ("refined_prompt", "image_caption", "filename_prefix", "video_prompt")
     FUNCTION = "refine"
     CATEGORY = "conditioning/klein"
 
@@ -800,6 +905,8 @@ class KPPBVLMRefiner:
         claude_model="opus",
         trigger_word="ohwx",
         sfw_prompt=False,
+        generate_video_prompt=False,
+        motion_prompt="",
     ):
         # ── Encode all images to base64 (needed by both paths) ──
         images_b64 = []
@@ -822,6 +929,12 @@ class KPPBVLMRefiner:
                 images_b64.append(_tensor_to_base64(prop_ref[0]))
             else:
                 images_b64.append(_tensor_to_base64(prop_ref))
+
+        # ── Build video prompt (deterministic, no LLM call) ──
+        vid_prompt = ""
+        if generate_video_prompt:
+            vid_prompt = _build_video_prompt(prompt_json, motion_prompt)
+            print(f"[KPPB] Video prompt ({len(vid_prompt)} chars): {vid_prompt[:200]}")
 
         # ════════════════════════════════════════
         # CLAUDE CODE PATH — one-shot with images
@@ -918,7 +1031,7 @@ class KPPBVLMRefiner:
                     print(f"[KPPB] Generation prompt ({len(gen_prompt)} chars): {gen_prompt[:300]}")
                     print(f"[KPPB] Training caption ({len(caption)} chars): {caption[:300]}")
                     print(f"[KPPB] Filename prefix: {fname}")
-                    return (gen_prompt, caption, fname)
+                    return (gen_prompt, caption, fname, vid_prompt)
 
             if result and not result.endswith("."):
                 result += "."
@@ -931,7 +1044,7 @@ class KPPBVLMRefiner:
             print(f"[KPPB] ═══ FINAL OUTPUT ({len(result)} chars) ═══")
             print(f"[KPPB] {result[:500]}")
             # Claude mode returns same for both outputs (no separate caption stage)
-            return (result, result, fname)
+            return (result, result, fname, vid_prompt)
 
         # ════════════════════════════════════════
         # OLLAMA PATH — one-shot VLM compose
@@ -1033,7 +1146,7 @@ class KPPBVLMRefiner:
                 print(f"[KPPB] Generation prompt ({len(gen_prompt)} chars): {gen_prompt[:300]}")
                 print(f"[KPPB] Training caption ({len(caption)} chars): {caption[:300]}")
                 print(f"[KPPB] Filename prefix: {fname}")
-                return (gen_prompt, caption, fname)
+                return (gen_prompt, caption, fname, vid_prompt)
             # Fallback if JSON parse failed
             print(f"[KPPB] Warning: dataset JSON parse failed, using raw output")
 
@@ -1057,4 +1170,4 @@ class KPPBVLMRefiner:
         print(f"[KPPB] ═══ FINAL OUTPUT ({len(result)} chars) ═══")
         print(f"[KPPB] {result[:500]}")
 
-        return (result, result, fname)
+        return (result, result, fname, vid_prompt)
