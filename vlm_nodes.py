@@ -679,6 +679,28 @@ def _make_filename_prefix(prompt_json="", mode=""):
 
 
 # ──────────────────────────────────────────────
+# SFW content safety transform
+# ──────────────────────────────────────────────
+
+SFW_INSTRUCTION = """
+
+─── CONTENT SAFETY ───
+The output prompt will be sent to a hosted image generation model with strict \
+content safety filters (Google Gemini). You MUST transform any suggestive, \
+revealing, or potentially prohibited content so that it passes these filters:
+- Replace revealing outfits with stylish but modest alternatives \
+(e.g. "sheer blouse" → "silk blouse", "micro skirt" → "mini skirt", \
+"lingerie" → omit or replace with casual loungewear)
+- Replace "without top/bottom/shoes" removal instructions with a \
+covered alternative instead
+- Avoid any language implying nudity, undressing, or sexual posing
+- Keep poses natural and non-suggestive
+- The scene should read as a fashion editorial or lifestyle photo
+Do NOT mention that you are softening or filtering — just write the \
+clean version directly."""
+
+
+# ──────────────────────────────────────────────
 # Modes
 # ──────────────────────────────────────────────
 
@@ -733,6 +755,8 @@ class KPPBVLMRefiner:
                                                   "tooltip": "Claude model to use (sonnet recommended for speed/quality balance)"}),
                 "trigger_word": ("STRING", {"default": "ohwx",
                                             "tooltip": "Trigger word for LoRA training captions (dataset generation mode only)"}),
+                "sfw_prompt": ("BOOLEAN", {"default": False,
+                                           "tooltip": "Soften the output prompt to pass content safety filters on hosted models like nanobanana/Gemini. Leave off for local models."}),
             },
         }
 
@@ -760,6 +784,7 @@ class KPPBVLMRefiner:
         use_claude_code=False,
         claude_model="opus",
         trigger_word="ohwx",
+        sfw_prompt=False,
     ):
         # ── Encode all images to base64 (needed by both paths) ──
         images_b64 = []
@@ -801,6 +826,9 @@ class KPPBVLMRefiner:
                 claude_sys = PROSE_SYSTEM_DATASET
             else:
                 claude_sys = PROSE_SYSTEM_CAPTION
+
+            if sfw_prompt:
+                claude_sys += SFW_INSTRUCTION
 
             # Build user prompt with image labels
             image_labels = []
@@ -910,6 +938,9 @@ class KPPBVLMRefiner:
             sys_prompt = PROSE_SYSTEM_DATASET
         else:
             sys_prompt = VLM_SYSTEM_CAPTION
+
+        if sfw_prompt:
+            sys_prompt += SFW_INSTRUCTION
 
         # ── Build user message with settings ──
         parts = []
