@@ -404,17 +404,33 @@ No reasoning, no labels, no markdown, no quotes.
 
 SECTION 1 (nanobanana generation prompt):
 A detailed natural-language instruction for Gemini to generate a photorealistic \
-image of the person from the reference. Include:
-- "Generate a photorealistic photo of the person from the reference image"
-- Pose/action, outfit, hairstyle (from settings)
-- Environment/scene with specific details
-- Lighting — be vivid and specific, this drives realism
-- Camera framing, lens, depth of field
-- Mood and color grading
-- "Maintain exact facial likeness, body proportions, and all identifying \
-features from the reference"
-Write as one flowing paragraph. Be specific enough that Gemini produces \
-a high-quality, diverse training image.
+image of the EXACT same person from the reference image.
+
+CRITICAL IDENTITY RULES for Section 1:
+- ALWAYS open with: "Generate a photorealistic photo of the exact same person \
+from the reference image"
+- ALWAYS close with the FULL identity lock paragraph (see below)
+- NEVER describe or mention the subject's eye color, face shape, skin tone, \
+hair color (unless the settings explicitly override hair). Describing these \
+features causes Gemini to OVERRIDE the reference and invent new features.
+- The reference image is the SOLE source of identity. Your text must only \
+describe the SCENE, not the PERSON.
+
+After the opening line, describe ONLY the scene parameters from settings:
+1. Pose/action
+2. Outfit
+3. Environment/scene — be specific with atmosphere details
+4. Lighting — be vivid and cinematic, this drives realism
+5. Camera framing, lens, depth of field
+6. Mood and color grading
+7. Hairstyle ONLY if settings override it (non-empty)
+
+MANDATORY CLOSING (include VERBATIM at the end of every prompt):
+"The subject must be the exact same person from the reference image. \
+Maintain identical facial structure, bone structure, exact eye color, \
+exact eye shape, nose shape, lip shape, jawline, skin tone, body type, \
+body proportions, breast size and shape, and all identifying marks. \
+Do not change, idealize, or reinterpret any physical feature."
 
 SECTION 2 (LoRA training caption — after ---CAPTION---):
 A 1-3 sentence natural-language caption for the .txt file. Rules:
@@ -428,14 +444,18 @@ from the images and ties them to the trigger word
 - Keep it concise — the model learns better from clean, focused captions
 
 ─── EXAMPLE OUTPUT ───
-Generate a photorealistic photo of the person from the reference image, \
-standing with one hand on hip wearing a white oversized t-shirt and denim \
-shorts. Set in a cozy cafe with warm wood tones and soft ambient lighting. \
-Golden hour sunlight streams through a large window casting warm amber tones \
-and gentle shadows across the scene. Waist-up portrait framed at 85mm with \
-shallow depth of field softly blurring the background. Casual relaxed mood \
-with natural warm color grading. Maintain exact facial likeness, body \
-proportions, and all identifying features from the reference.
+Generate a photorealistic photo of the exact same person from the reference \
+image, standing with one hand on hip wearing a white oversized t-shirt and \
+denim shorts. Set in a cozy cafe with warm wood tones and soft ambient \
+lighting. Golden hour sunlight streams through a large window casting warm \
+amber tones and gentle shadows across the scene. Waist-up portrait framed \
+at 85mm with shallow depth of field softly blurring the background. Casual \
+relaxed mood with natural warm color grading. The subject must be the exact \
+same person from the reference image. Maintain identical facial structure, \
+bone structure, exact eye color, exact eye shape, nose shape, lip shape, \
+jawline, skin tone, body type, body proportions, breast size and shape, \
+and all identifying marks. Do not change, idealize, or reinterpret any \
+physical feature.
 ---CAPTION---
 [trigger], standing with one hand on hip wearing a white oversized t-shirt \
 and denim shorts, golden hour sunlight streaming through a cafe window, \
