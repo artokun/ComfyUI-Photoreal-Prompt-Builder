@@ -695,6 +695,21 @@ SHOES = [_UNSET, _RND, _REMOVE] + sorted([
     "Lace-up heels", "Thigh-high heeled boots", "Barefoot",
 ])
 
+CLOTHING_COLORS = [_UNSET, _RND] + sorted([
+    "black", "white", "cream", "ivory", "beige", "tan", "camel",
+    "brown", "chocolate", "cognac", "burgundy", "maroon", "wine",
+    "red", "cherry", "coral", "salmon", "pink", "hot pink", "blush",
+    "mauve", "lavender", "lilac", "purple", "plum", "violet",
+    "navy", "royal blue", "cobalt", "baby blue", "sky blue", "teal",
+    "turquoise", "aqua", "mint", "sage", "olive", "forest green",
+    "emerald", "hunter green", "khaki", "army green",
+    "orange", "rust", "burnt orange", "peach", "mustard", "gold",
+    "yellow", "lemon", "charcoal", "gray", "light gray", "silver",
+    "metallic gold", "metallic silver", "rose gold",
+    "denim blue", "pastel", "neon", "tie-dye", "camo",
+    "leopard print", "plaid", "striped", "floral",
+])
+
 ACCESSORIES = [_UNSET, _RND] + sorted([
     "Belt", "Chain belt", "Sunglasses", "Eyeglasses", "Beanie",
     "Baseball cap", "Handbag", "Backpack", "Headphones", "Watch",
@@ -716,13 +731,19 @@ class KPPBOutfitComposer:
         return {
             "required": {
                 "top": (TOPS, {"default": _UNSET}),
+                "top_color": (CLOTHING_COLORS, {"default": _UNSET}),
                 "bottom": (BOTTOMS, {"default": _UNSET}),
+                "bottom_color": (CLOTHING_COLORS, {"default": _UNSET}),
                 "shoes": (SHOES, {"default": _UNSET}),
+                "shoes_color": (CLOTHING_COLORS, {"default": _UNSET}),
             },
             "optional": {
                 "lingerie_top": (LINGERIE_TOPS, {"default": _UNSET}),
+                "lingerie_top_color": (CLOTHING_COLORS, {"default": _UNSET}),
                 "lingerie_bottom": (LINGERIE_BOTTOMS, {"default": _UNSET}),
+                "lingerie_bottom_color": (CLOTHING_COLORS, {"default": _UNSET}),
                 "outerwear": (OUTERWEAR, {"default": _UNSET}),
+                "outerwear_color": (CLOTHING_COLORS, {"default": _UNSET}),
                 "accessory_1": (ACCESSORIES, {"default": _UNSET}),
                 "accessory_2": (ACCESSORIES, {"default": _UNSET}),
                 "accessory_3": (ACCESSORIES, {"default": _UNSET}),
@@ -738,11 +759,17 @@ class KPPBOutfitComposer:
     def compose_outfit(
         self,
         top=_UNSET,
+        top_color=_UNSET,
         bottom=_UNSET,
+        bottom_color=_UNSET,
         shoes=_UNSET,
+        shoes_color=_UNSET,
         lingerie_top=_UNSET,
+        lingerie_top_color=_UNSET,
         lingerie_bottom=_UNSET,
+        lingerie_bottom_color=_UNSET,
         outerwear=_UNSET,
+        outerwear_color=_UNSET,
         accessory_1=_UNSET,
         accessory_2=_UNSET,
         accessory_3=_UNSET,
@@ -750,11 +777,17 @@ class KPPBOutfitComposer:
     ):
         # Resolve random selections
         top = _resolve_random(top, TOPS)
+        top_color = _resolve_random(top_color, CLOTHING_COLORS)
         bottom = _resolve_random(bottom, BOTTOMS)
+        bottom_color = _resolve_random(bottom_color, CLOTHING_COLORS)
         shoes = _resolve_random(shoes, SHOES)
+        shoes_color = _resolve_random(shoes_color, CLOTHING_COLORS)
         lingerie_top = _resolve_random(lingerie_top, LINGERIE_TOPS)
+        lingerie_top_color = _resolve_random(lingerie_top_color, CLOTHING_COLORS)
         lingerie_bottom = _resolve_random(lingerie_bottom, LINGERIE_BOTTOMS)
+        lingerie_bottom_color = _resolve_random(lingerie_bottom_color, CLOTHING_COLORS)
         outerwear = _resolve_random(outerwear, OUTERWEAR)
+        outerwear_color = _resolve_random(outerwear_color, CLOTHING_COLORS)
         accessory_1 = _resolve_random(accessory_1, ACCESSORIES)
         accessory_2 = _resolve_random(accessory_2, ACCESSORIES)
         accessory_3 = _resolve_random(accessory_3, ACCESSORIES)
@@ -763,16 +796,25 @@ class KPPBOutfitComposer:
         removed = []
         _skip = {_UNSET, _REMOVE, _RND}
 
+        def _with_color(item, color):
+            """Prepend color to item if color is set, e.g. 'red t-shirt'."""
+            if color and color not in _skip:
+                return f"{color} {item.lower()}"
+            return item.lower()
+
         # Gather clothing pieces, track removals
-        for label, item in [
-            ("lingerie top", lingerie_top), ("lingerie bottom", lingerie_bottom),
-            ("top", top), ("bottom", bottom),
-            ("outerwear", outerwear), ("shoes", shoes),
+        for label, item, color in [
+            ("lingerie top", lingerie_top, lingerie_top_color),
+            ("lingerie bottom", lingerie_bottom, lingerie_bottom_color),
+            ("top", top, top_color),
+            ("bottom", bottom, bottom_color),
+            ("outerwear", outerwear, outerwear_color),
+            ("shoes", shoes, shoes_color),
         ]:
             if item == _REMOVE:
                 removed.append(label)
             elif item and item not in _skip:
-                pieces.append(item.lower())
+                pieces.append(_with_color(item, color))
 
         # Accessories (no remove option — just unset or pick)
         seen_acc = set()
