@@ -1,5 +1,6 @@
 import json
 import os
+import random
 
 # ── NSFW config ──
 _DIR = os.path.dirname(os.path.abspath(__file__))
@@ -24,12 +25,23 @@ IDENTITY_LOCK_PROMPT = (
 # "as in reference" default for all dropdowns
 # ──────────────────────────────────────────────
 _REF = "as in reference"
+_RND = "random"
+
+
+def _resolve_random(value, options):
+    """If value is 'random', pick a random concrete option (skip ref/random/custom)."""
+    if value != _RND:
+        return value
+    concrete = [v for v in options if v not in (_REF, _RND, "custom")]
+    return random.choice(concrete) if concrete else _REF
+
 
 # ──────────────────────────────────────────────
 # Lighting presets with rich prose expansions
 # ──────────────────────────────────────────────
 LIGHTING_EXPANSIONS = {
     _REF: "",
+    _RND: "",
     "ring light": "even ring light illumination with circular catchlights in the eyes and minimal shadows",
     "softbox beauty": "professional softbox beauty lighting with soft wrap-around illumination and flattering skin tones",
     "natural window light": "soft natural light streaming through a window, creating gentle gradients from light to shadow",
@@ -53,6 +65,7 @@ LIGHTING_EXPANSIONS = {
 # ──────────────────────────────────────────────
 SCENE_TYPES = [
     _REF,
+    _RND,
     "bedroom",
     "bathroom",
     "living room",
@@ -78,6 +91,7 @@ SCENE_TYPES = [
 # ──────────────────────────────────────────────
 SHOT_TYPES = [
     _REF,
+    _RND,
     "extreme close-up",
     "close-up face",
     "headshot",
@@ -100,6 +114,7 @@ SHOT_TYPES = [
 # ──────────────────────────────────────────────
 CAMERA_ANGLES = [
     _REF,
+    _RND,
     "eye level",
     "slightly low angle",
     "slightly high angle",
@@ -119,6 +134,7 @@ CAMERA_ANGLES = [
 # ──────────────────────────────────────────────
 LENSES = [
     _REF,
+    _RND,
     "24mm wide",
     "35mm",
     "50mm",
@@ -134,6 +150,7 @@ LENSES = [
 # ──────────────────────────────────────────────
 DEPTH_OF_FIELD = [
     _REF,
+    _RND,
     "razor thin f/1.4",
     "shallow f/2.0",
     "shallow f/2.8",
@@ -147,6 +164,7 @@ DEPTH_OF_FIELD = [
 # ──────────────────────────────────────────────
 PHOTO_STYLES = [
     _REF,
+    _RND,
     "phone candid",
     "mirror selfie",
     "editorial",
@@ -169,6 +187,7 @@ PHOTO_STYLES = [
 # ──────────────────────────────────────────────
 POSES = [
     _REF,
+    _RND,
     "standing",
     "standing hand on hip",
     "standing both hands on hips",
@@ -229,6 +248,7 @@ POSES = [
 # ──────────────────────────────────────────────
 HAIR_COLORS = [
     "as in reference",
+    _RND,
     "ash blonde",
     "auburn",
     "black",
@@ -262,6 +282,7 @@ HAIR_COLORS = [
 
 HAIRSTYLES = [
     "as in reference",
+    _RND,
     "beach waves",
     "blunt bob",
     "box braids",
@@ -304,6 +325,7 @@ HAIRSTYLES = [
 # ──────────────────────────────────────────────
 COLOR_GRADINGS = [
     _REF,
+    _RND,
     "natural",
     "warm golden",
     "cool blue",
@@ -413,6 +435,19 @@ class KPPBPromptBuilder:
         remove_bra=False,
         remove_panties=False,
     ):
+        # ── Resolve "random" selections ──
+        pose = _resolve_random(pose, POSES)
+        scene_type = _resolve_random(scene_type, SCENE_TYPES)
+        shot_type = _resolve_random(shot_type, SHOT_TYPES)
+        camera_angle = _resolve_random(camera_angle, CAMERA_ANGLES)
+        lighting_setup = _resolve_random(lighting_setup, LIGHTING_SETUPS)
+        photo_style = _resolve_random(photo_style, PHOTO_STYLES)
+        lens = _resolve_random(lens, LENSES)
+        depth_of_field = _resolve_random(depth_of_field, DEPTH_OF_FIELD)
+        color_grading = _resolve_random(color_grading, COLOR_GRADINGS)
+        hairstyle = _resolve_random(hairstyle, HAIRSTYLES)
+        hair_color = _resolve_random(hair_color, HAIR_COLORS)
+
         _is_ref = lambda v: v == _REF
         _expand = lambda v: NSFW_POSE_EXPANSIONS.get(v, NSFW_ACTION_EXPANSIONS.get(v, NSFW_GROUP_ACTION_EXPANSIONS.get(v, v)))
         sentences = []
