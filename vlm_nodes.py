@@ -611,7 +611,7 @@ def _claude_code_chat(system_prompt, user_prompt, model="sonnet", images_b64=Non
 
 def _parse_dataset_json(text, trigger_word="ohwx"):
     """Parse structured dataset output (JSON or delimiter fallback).
-    Returns (gen_prompt, caption) or (None, None) if parsing fails."""
+    Returns (gen_prompt, caption, video_prompt) or (None, None, None) if parsing fails."""
     text = text.strip()
 
     # Strip markdown code fences if present
@@ -625,13 +625,14 @@ def _parse_dataset_json(text, trigger_word="ohwx"):
         data = json.loads(text)
         gen_prompt = data.get("prompt", "").strip()
         caption = data.get("caption", "").strip()
+        video_prompt = data.get("video_prompt", "").strip()
         if gen_prompt:
             caption = caption.replace("[trigger]", trigger_word)
             if not gen_prompt.endswith("."):
                 gen_prompt += "."
             if caption and not caption.endswith("."):
                 caption += "."
-            return (gen_prompt, caption)
+            return (gen_prompt, caption, video_prompt)
     except (json.JSONDecodeError, TypeError, AttributeError):
         pass
 
@@ -645,9 +646,17 @@ def _parse_dataset_json(text, trigger_word="ohwx"):
             gen_prompt += "."
         if caption and not caption.endswith("."):
             caption += "."
-        return (gen_prompt, caption)
+        return (gen_prompt, caption, "")
 
-    return (None, None)
+    return (None, None, None)
+
+
+def _extract_video_prompt(text):
+    """Extract video prompt from ---VIDEO--- delimiter. Returns (main_text, video_prompt)."""
+    if "---VIDEO---" in text:
+        parts = text.split("---VIDEO---", 1)
+        return (parts[0].strip(), parts[1].strip())
+    return (text, "")
 
 
 # ──────────────────────────────────────────────
@@ -716,112 +725,46 @@ Write the clean version directly. Do NOT mention filtering or safety."""
 
 
 # ──────────────────────────────────────────────
-# Video prompt builder (Wan 2.6 I2V)
+# Video prompt instruction (Wan 2.6 I2V)
 # ──────────────────────────────────────────────
 
-# Ambient motion fallbacks keyed by scene type
-_SCENE_AMBIENT = {
-    "bedroom": "soft curtain sway, gentle breathing, warm light flicker",
-    "bathroom": "steam drifting slowly, water droplets on glass, soft mirror reflection shimmer",
-    "living room": "gentle ambient light shift, soft fabric settling, dust motes in sunlight",
-    "kitchen": "steam rising, warm light shifting, subtle cabinet reflection",
-    "hotel room": "curtain billowing softly, city light glow shifting, ambient settling",
-    "urban street": "distant traffic passing, neon signs flickering, gentle wind in hair",
-    "cafe": "steam curling from a cup, warm ambient light shift, soft background chatter motion",
-    "bar/club": "neon light pulse, ambient haze drifting, colored light sweep",
-    "rooftop": "hair gently blowing in wind, city lights twinkling below, soft cloud drift",
-    "beach": "hair and fabric flowing in ocean breeze, waves rolling in background, warm light shimmer",
-    "pool": "water surface rippling, light reflections dancing, gentle poolside breeze",
-    "park": "leaves rustling, dappled sunlight shifting through trees, gentle breeze in hair",
-    "gym": "subtle breathing motion, ambient gym activity, fluorescent light hum",
-    "studio": "subtle posing micro-movements, soft studio light adjustment, gentle hair settle",
-    "balcony": "gentle breeze, hair swaying softly, distant city ambience",
-    "car": "passing streetlights casting moving shadows, subtle engine vibration, dashboard glow",
-    "stairwell": "overhead light flicker, subtle shadow shift, ambient echo feeling",
-    "hallway/corridor": "distant footsteps echo, overhead light flicker, gentle perspective shift",
-}
+VIDEO_PROMPT_INSTRUCTION = """
 
-# Motion mappings from common poses
-_POSE_MOTION = {
-    "standing": "subtle weight shift, gentle breathing motion",
-    "sitting": "gentle posture adjustment, soft hand gesture",
-    "walking": "confident stride forward, arms swinging naturally, hair bouncing with each step",
-    "leaning": "gentle weight shift against surface, relaxed breathing",
-    "crouching": "slow rise or gentle rocking motion",
-    "lying down": "soft breathing, gentle body settle",
-    "kneeling": "subtle posture sway, gentle head tilt",
-    "reclining": "gentle breathing, soft arm adjustment",
-    "dancing": "fluid rhythmic movement, spinning or swaying to music, fabric flowing with motion",
-    "jumping": "dynamic upward motion, hair floating, fabric catching air",
-    "running": "athletic forward motion, hair streaming back, arms pumping",
-    "stretching": "slow fluid extension, deep breathing visible, graceful movement",
-    "twisting": "slow rotation of torso, hair following the turn",
-    "bending": "smooth downward arc, hair falling forward",
-}
+─── VIDEO PROMPT (ADDITIONAL OUTPUT) ───
+You must ALSO output a video prompt for Wan 2.6 Image-to-Video generation.
+The video prompt converts your static scene description into a single \
+continuous cinematic shot with motion, camera movement, and atmosphere.
 
+STRUCTURE:
+1. OPENING — establish mood, atmosphere, camera style, and lighting feel \
+in 1-2 sentences. Set the cinematic tone.
+2. ACTION — describe what happens in the scene as one flowing sequence. \
+Embed camera directions naturally (zoom in, pan, track, hold steady). \
+Include the subject's movements, expressions, gestures, and any physical \
+motion (hair, fabric, breathing). Write it as if directing a single \
+continuous take.
+3. CLOSING — anchor continuity: "Ensure smooth transitions, stable \
+identity, and soft enveloping light throughout."
 
-def _build_video_prompt(prompt_json="", motion_prompt="", audio_prompt=""):
-    """Build a Wan 2.6 I2V motion prompt from scene data.
-    Priority: motion_prompt override > action > pose motion > scene ambient.
-    Audio prompt is appended when provided."""
-    # 1. Direct motion override
-    if motion_prompt and motion_prompt.strip():
-        result = motion_prompt.strip()
-        if audio_prompt and audio_prompt.strip():
-            result += f" Audio: {audio_prompt.strip()}"
-        return result
+RULES:
+- This is ONE continuous scene, NOT multiple cuts or scenes
+- Write as T2V (text-to-video) — describe what HAPPENS, not a static image
+- Weave in any motion hints and audio descriptions the user provided as \
+natural parts of the scene, not appended afterthoughts
+- Camera should feel present and cinematic — slow zooms, gentle drifts, \
+smooth tracking
+- Include ambient environmental motion (wind, light shifts, background \
+movement) to make the scene feel alive
+- Keep the subject's identity stable — reference "the woman" consistently
+- If audio is described, weave it into the action naturally \
+(e.g. "she says 'hello' softly as she turns toward the camera")"""
 
-    # 2. Parse scene data
-    data = {}
-    if prompt_json and prompt_json.strip():
-        try:
-            data = json.loads(prompt_json)
-        except (json.JSONDecodeError, TypeError):
-            pass
+VIDEO_PROMPT_JSON_INSTRUCTION = """
+Add a "video_prompt" field to your JSON output containing the video prompt."""
 
-    parts = []
-
-    # 3. Action field — the strongest motion signal
-    action = data.get("action", "").strip()
-    if action:
-        parts.append(action)
-
-    # 4. Pose-derived motion
-    pose = data.get("pose", "").strip().lower()
-    if pose:
-        for key, motion in _POSE_MOTION.items():
-            if key in pose:
-                parts.append(motion)
-                break
-
-    # 5. Scene ambient motion
-    scene = data.get("scene_type", "").strip().lower()
-    if scene and scene in _SCENE_AMBIENT:
-        parts.append(_SCENE_AMBIENT[scene])
-
-    # 6. Lighting-derived motion
-    lighting = data.get("lighting_setup", "").strip().lower()
-    if "golden hour" in lighting:
-        parts.append("warm golden light slowly shifting")
-    elif "neon" in lighting:
-        parts.append("neon colors pulsing and reflecting")
-    elif "candlelight" in lighting:
-        parts.append("candlelight flickering, warm shadows dancing")
-    elif "backlit" in lighting:
-        parts.append("sun flare gently shifting")
-
-    if not parts:
-        # Ultimate fallback — subtle ambient
-        parts.append("subtle natural movement, gentle breathing, soft ambient light shift")
-
-    # Combine and deduplicate
-    combined = ", ".join(parts)
-    # Prefix with cinematic camera feel
-    result = f"Smooth cinematic motion. {combined}. Camera holds steady with subtle drift."
-    # Append audio description
-    if audio_prompt and audio_prompt.strip():
-        result += f" Audio: {audio_prompt.strip()}"
-    return result
+VIDEO_PROMPT_DELIM_INSTRUCTION = """
+After your main output, add the delimiter ---VIDEO--- on its own line, \
+then write the video prompt."""
 
 
 # ──────────────────────────────────────────────
@@ -941,12 +884,6 @@ class KPPBVLMRefiner:
             else:
                 images_b64.append(_tensor_to_base64(prop_ref))
 
-        # ── Build video prompt (deterministic, no LLM call) ──
-        vid_prompt = ""
-        if generate_video_prompt:
-            vid_prompt = _build_video_prompt(prompt_json, motion_prompt, audio_prompt)
-            print(f"[KPPB] Video prompt ({len(vid_prompt)} chars): {vid_prompt[:200]}")
-
         # ════════════════════════════════════════
         # CLAUDE CODE PATH — one-shot with images
         # ════════════════════════════════════════
@@ -968,6 +905,13 @@ class KPPBVLMRefiner:
 
             if sfw_prompt:
                 claude_sys += SFW_INSTRUCTION
+
+            if generate_video_prompt:
+                claude_sys += VIDEO_PROMPT_INSTRUCTION
+                if mode == "dataset generation":
+                    claude_sys += VIDEO_PROMPT_JSON_INSTRUCTION
+                else:
+                    claude_sys += VIDEO_PROMPT_DELIM_INSTRUCTION
 
             # Build user prompt with image labels
             image_labels = []
@@ -1009,6 +953,16 @@ class KPPBVLMRefiner:
                     "Describe Image 1 as an optimized Klein 9B generation prompt in one concise paragraph."
                 )
 
+            # Append motion/audio hints for video prompt
+            if generate_video_prompt:
+                hints = []
+                if motion_prompt and motion_prompt.strip():
+                    hints.append(f"MOTION HINT: {motion_prompt.strip()}")
+                if audio_prompt and audio_prompt.strip():
+                    hints.append(f"AUDIO HINT: {audio_prompt.strip()}")
+                if hints:
+                    parts.append("\n".join(hints))
+
             claude_user_msg = "\n\n".join(parts)
 
             result = _claude_code_chat(
@@ -1033,16 +987,25 @@ class KPPBVLMRefiner:
                 else:
                     result = "photorealistic portrait."
 
-            # ── Dataset generation: parse JSON with prompt + caption ──
+            # ── Dataset generation: parse JSON with prompt + caption + video ──
             if mode == "dataset generation":
-                gen_prompt, caption = _parse_dataset_json(result, trigger_word)
+                gen_prompt, caption, ds_vid = _parse_dataset_json(result, trigger_word)
                 if gen_prompt:
                     fname = _make_filename_prefix(prompt_json, mode)
                     print(f"[KPPB] ═══ DATASET OUTPUT ═══")
                     print(f"[KPPB] Generation prompt ({len(gen_prompt)} chars): {gen_prompt[:300]}")
                     print(f"[KPPB] Training caption ({len(caption)} chars): {caption[:300]}")
+                    if ds_vid:
+                        print(f"[KPPB] Video prompt ({len(ds_vid)} chars): {ds_vid[:200]}")
                     print(f"[KPPB] Filename prefix: {fname}")
-                    return (gen_prompt, caption, fname, vid_prompt)
+                    return (gen_prompt, caption, fname, ds_vid)
+
+            # ── Extract video prompt if present ──
+            vid_prompt = ""
+            if generate_video_prompt:
+                result, vid_prompt = _extract_video_prompt(result)
+                if vid_prompt:
+                    print(f"[KPPB] Video prompt ({len(vid_prompt)} chars): {vid_prompt[:200]}")
 
             if result and not result.endswith("."):
                 result += "."
@@ -1081,6 +1044,13 @@ class KPPBVLMRefiner:
         if sfw_prompt:
             sys_prompt += SFW_INSTRUCTION
 
+        if generate_video_prompt:
+            sys_prompt += VIDEO_PROMPT_INSTRUCTION
+            if is_dataset:
+                sys_prompt += VIDEO_PROMPT_JSON_INSTRUCTION
+            else:
+                sys_prompt += VIDEO_PROMPT_DELIM_INSTRUCTION
+
         # ── Build user message with settings ──
         parts = []
 
@@ -1118,6 +1088,16 @@ class KPPBVLMRefiner:
         else:  # caption only
             parts.append("Write the Klein 9B prompt describing this image.")
 
+        # Append motion/audio hints for video prompt
+        if generate_video_prompt:
+            hints = []
+            if motion_prompt and motion_prompt.strip():
+                hints.append(f"MOTION HINT: {motion_prompt.strip()}")
+            if audio_prompt and audio_prompt.strip():
+                hints.append(f"AUDIO HINT: {audio_prompt.strip()}")
+            if hints:
+                parts.append("\n".join(hints))
+
         user_msg = "/nothink\n\n" + "\n\n".join(parts)
         print(f"[KPPB] User message:\n{user_msg[:400]}...")
 
@@ -1150,16 +1130,25 @@ class KPPBVLMRefiner:
 
         # ── Dataset mode: parse JSON ──
         if is_dataset:
-            gen_prompt, caption = _parse_dataset_json(result, trigger_word)
+            gen_prompt, caption, ds_vid = _parse_dataset_json(result, trigger_word)
             if gen_prompt:
                 fname = _make_filename_prefix(prompt_json, mode)
                 print(f"[KPPB] ═══ DATASET OUTPUT ═══")
                 print(f"[KPPB] Generation prompt ({len(gen_prompt)} chars): {gen_prompt[:300]}")
                 print(f"[KPPB] Training caption ({len(caption)} chars): {caption[:300]}")
+                if ds_vid:
+                    print(f"[KPPB] Video prompt ({len(ds_vid)} chars): {ds_vid[:200]}")
                 print(f"[KPPB] Filename prefix: {fname}")
-                return (gen_prompt, caption, fname, vid_prompt)
+                return (gen_prompt, caption, fname, ds_vid)
             # Fallback if JSON parse failed
             print(f"[KPPB] Warning: dataset JSON parse failed, using raw output")
+
+        # ── Extract video prompt if present ──
+        vid_prompt = ""
+        if generate_video_prompt:
+            result, vid_prompt = _extract_video_prompt(result)
+            if vid_prompt:
+                print(f"[KPPB] Video prompt ({len(vid_prompt)} chars): {vid_prompt[:200]}")
 
         if result and not result.endswith("."):
             result += "."
