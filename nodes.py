@@ -687,7 +687,7 @@ SHOES = [_UNSET, _RND, _REMOVE] + sorted([
     "Lace-up heels", "Thigh-high heeled boots", "Barefoot",
 ])
 
-ACCESSORIES = [_UNSET, _RND, _REMOVE] + sorted([
+ACCESSORIES = [_UNSET, _RND] + sorted([
     "Belt", "Chain belt", "Sunglasses", "Eyeglasses", "Beanie",
     "Baseball cap", "Handbag", "Backpack", "Headphones", "Watch",
     "Choker", "Leather choker", "Spiked choker", "Body harness",
@@ -766,11 +766,9 @@ class KPPBOutfitComposer:
             elif item and item not in _skip:
                 pieces.append(item.lower())
 
-        # Accessories
+        # Accessories (no remove option — just unset or pick)
         seen_acc = set()
         for item in [accessory_1, accessory_2, accessory_3]:
-            if item == _REMOVE:
-                continue
             if item and item not in _skip and item.lower() not in seen_acc:
                 pieces.append(item.lower())
                 seen_acc.add(item.lower())
@@ -791,11 +789,11 @@ class KPPBOutfitComposer:
 
         # Append removal instructions
         if removed:
-            no_str = "No " + ", no ".join(removed)
+            without_str = "without " + ", without ".join(removed)
             if outfit_str:
-                outfit_str = f"{outfit_str}. {no_str}"
+                outfit_str = f"{outfit_str}, {without_str}"
             else:
-                outfit_str = no_str
+                outfit_str = without_str.capitalize()
 
         if extra_outfit_details and extra_outfit_details.strip():
             extra = extra_outfit_details.strip()
