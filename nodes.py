@@ -22,9 +22,9 @@ IDENTITY_LOCK_PROMPT = (
 )
 
 # ──────────────────────────────────────────────
-# "as in reference" default for all dropdowns
+# "unset" default for all dropdowns
 # ──────────────────────────────────────────────
-_REF = "as in reference"
+_REF = "unset"
 _RND = "random"
 
 
@@ -250,7 +250,7 @@ POSES = [
 # Hairstyles
 # ──────────────────────────────────────────────
 HAIR_COLORS = [
-    "as in reference",
+    _REF,
     _RND,
     "ash blonde",
     "auburn",
@@ -284,7 +284,7 @@ HAIR_COLORS = [
 ]
 
 HAIRSTYLES = [
-    "as in reference",
+    _REF,
     _RND,
     "beach waves",
     "blunt bob",
@@ -382,8 +382,8 @@ class KPPBPromptBuilder:
                 "lens": (LENSES, {"default": _REF}),
                 "depth_of_field": (DEPTH_OF_FIELD, {"default": _REF}),
                 "color_grading": (COLOR_GRADINGS, {"default": _REF}),
-                "hairstyle": (HAIRSTYLES, {"default": "as in reference"}),
-                "hair_color": (HAIR_COLORS, {"default": "as in reference"}),
+                "hairstyle": (HAIRSTYLES, {"default": _REF}),
+                "hair_color": (HAIR_COLORS, {"default": _REF}),
                 "preserve_identity": ("BOOLEAN", {"default": True,
                                                   "tooltip": "Append identity lock phrase for character reference consistency"}),
             },
@@ -424,8 +424,8 @@ class KPPBPromptBuilder:
         depth_of_field,
         color_grading,
         action="",
-        hairstyle="as in reference",
-        hair_color="as in reference",
+        hairstyle=_REF,
+        hair_color=_REF,
         preserve_identity=True,
         outfit="",
         edit_instructions="",

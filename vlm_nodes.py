@@ -665,7 +665,7 @@ def _make_filename_prefix(prompt_json="", mode=""):
         # Pick the most descriptive fields
         for key in ("shot_type", "pose", "scene_type", "lighting_setup", "photo_style"):
             val = data.get(key, "")
-            if val and val != "as in reference":
+            if val and val != "unset":
                 parts.append(val)
     if not parts:
         parts.append(mode.replace(" ", "_") if mode else "img")
