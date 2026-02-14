@@ -431,8 +431,10 @@ Structure the prompt as one flowing paragraph:
 5. Lighting — vivid and cinematic, this drives realism
 6. Camera framing, lens, depth of field
 7. Mood and color grading
-8. Closing: "Maintain exact likeness, body proportions, and all identifying \
-features from the reference."
+8. Closing (include VERBATIM): "Maintain identical facial structure, bone \
+structure, exact eye color, eye shape, nose, lips, jawline, skin tone, \
+body type, body proportions, breast size and shape, and all identifying \
+marks from the reference."
 
 ─── CAPTION FIELD RULES ───
 A 1-3 sentence natural-language caption for the .txt file:
@@ -451,8 +453,10 @@ denim shorts. Set in a cozy cafe with warm wood tones and soft ambient \
 lighting. Golden hour sunlight streams through a large window casting \
 warm amber tones and gentle shadows across the scene. Waist-up portrait \
 framed at 85mm with shallow depth of field softly blurring the background. \
-Casual relaxed mood with natural warm color grading. Maintain exact \
-likeness, body proportions, and all identifying features from the reference.",
+Casual relaxed mood with natural warm color grading. Maintain identical \
+facial structure, bone structure, exact eye color, eye shape, nose, lips, \
+jawline, skin tone, body type, body proportions, breast size and shape, \
+and all identifying marks from the reference.",
   "caption": "[trigger], standing with one hand on hip wearing a white \
 oversized t-shirt and denim shorts, golden hour sunlight streaming through \
 a cafe window, warm amber tones, waist-up portrait shot at 85mm with \
