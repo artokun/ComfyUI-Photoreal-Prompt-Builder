@@ -503,6 +503,7 @@ def _claude_code_available():
 
 def _claude_code_chat(system_prompt, user_prompt, model="sonnet", images_b64=None):
     """Call Claude Code CLI. Supports text and image inputs. Returns response text."""
+    import os
     import subprocess
     import tempfile
 
@@ -544,12 +545,19 @@ def _claude_code_chat(system_prompt, user_prompt, model="sonnet", images_b64=Non
     print(f"[KPPB:CLAUDE] Calling Claude Code CLI (model={model}, images={len(images_b64 or [])})...")
     print(f"[KPPB:CLAUDE] Prompt: {full_prompt[:400]}...")
 
+    # Clean env: remove CLAUDECODE to avoid nested-session block,
+    # and ensure PATH includes common binary locations
+    env = os.environ.copy()
+    env.pop("CLAUDECODE", None)
+
     try:
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
             timeout=300,
+            stdin=subprocess.DEVNULL,
+            env=env,
         )
 
         if result.returncode != 0:
