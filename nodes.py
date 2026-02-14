@@ -28,7 +28,7 @@ _REF = "unset"
 _RND = "random"
 
 
-_SKIP_RANDOM = {_REF, _RND, "custom", "unset", "remove"}
+_SKIP_RANDOM = {_REF, _RND, "custom", "unset", "remove", "inherit from scene"}
 
 
 def _resolve_random(value, options):
@@ -42,8 +42,11 @@ def _resolve_random(value, options):
 # ──────────────────────────────────────────────
 # Lighting presets with rich prose expansions
 # ──────────────────────────────────────────────
+_INHERIT_SCENE = "inherit from scene"
+
 LIGHTING_EXPANSIONS = {
     _REF: "",
+    _INHERIT_SCENE: "",
     _RND: "",
     "ring light": "even ring light illumination with circular catchlights in the eyes and minimal shadows",
     "softbox beauty": "professional softbox beauty lighting with soft wrap-around illumination and flattering skin tones",
@@ -523,7 +526,12 @@ class KPPBPromptBuilder:
             sentences.append(d[0].upper() + d[1:] if d else d)
 
         # 6. Lighting (most impactful for Klein 9B)
-        lighting_prose = LIGHTING_EXPANSIONS.get(lighting_setup, "") if not _is_ref(lighting_setup) else ""
+        if lighting_setup == _INHERIT_SCENE and not _is_ref(scene_type):
+            lighting_prose = f"lighting natural to a {scene_type} setting"
+        elif lighting_setup == _INHERIT_SCENE:
+            lighting_prose = ""
+        else:
+            lighting_prose = LIGHTING_EXPANSIONS.get(lighting_setup, "") if not _is_ref(lighting_setup) else ""
         if lighting_custom and lighting_custom.strip():
             if lighting_prose:
                 lighting_prose = f"{lighting_prose}, {lighting_custom.strip()}"
