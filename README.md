@@ -144,7 +144,35 @@ Example workflows are in the [`examples/`](examples/) folder. Drag and drop the 
 
 | Workflow | Description |
 |---|---|
-| [`xy_plot_sfw.json`](examples/xy_plot_sfw.json) | SFW XY Plot batch generation — sweeps outfits and lighting across a grid |
+| [`xy_plot_minimal.json`](examples/xy_plot_minimal.json) | **Start here.** Minimal, self-contained XY Plot — sweeps outfit × pose into a grid using a plain Flux Klein txt2img pipeline. Only needs this pack + ComfyLab-Pack + comfy-core. |
+| [`xy_plot_sfw.json`](examples/xy_plot_sfw.json) | Advanced batch workflow with a Flux.2 Klein image-edit subgraph, face-detailer, and VLM refiner. Requires several extra custom node packs (see below). |
+
+### Required custom nodes
+
+The example workflows use third‑party nodes in addition to this pack and comfy‑core. Install these from **ComfyUI Manager → Custom Nodes Manager** (search by the name below), then restart ComfyUI.
+
+> [!IMPORTANT]
+> **ComfyLab-Pack must be installed manually** — search for **"ComfyLab Pack"** in the Manager. ComfyUI Manager's *Install Missing Custom Nodes* cannot auto-resolve `XYPlotQueue` / `XYPlotRender` because ComfyLab-Pack publishes those nodes under their display names (`XY Plot: Queue (lab)`), not their workflow type names. This is an upstream quirk, not a missing dependency.
+
+**`xy_plot_minimal.json`** — one extra pack:
+
+| Pack | Manager search | Provides |
+|---|---|---|
+| [ComfyLab-Pack](https://github.com/bugltd/ComfyLab-Pack) | `ComfyLab Pack` | `XYPlotQueue`, `XYPlotRender` |
+
+**`xy_plot_sfw.json`** — the above plus:
+
+| Pack | Manager search | Provides |
+|---|---|---|
+| [rgthree-comfy](https://github.com/rgthree/rgthree-comfy) | `rgthree` | `Fast Bypasser`, `Mute / Bypass Repeater` |
+| [ComfyUI-Impact-Pack](https://github.com/ltdrdata/ComfyUI-Impact-Pack) | `Impact Pack` | `BboxDetectorSEGS`, `ImpactSEGSToMaskList`, `MaskListToMaskBatch` |
+| [ComfyUI-Impact-Subpack](https://github.com/ltdrdata/ComfyUI-Impact-Subpack) | `Impact Subpack` | `UltralyticsDetectorProvider` |
+| [ComfyUI-Inspire-Pack](https://github.com/ltdrdata/ComfyUI-Inspire-Pack) | `Inspire Pack` | `KSampler //Inspire` |
+| [ComfyUI-LanPaint](https://github.com/scraed/LanPaint) | `LanPaint` | `LanPaint_KSampler` |
+| [ComfyUI-Easy-Use](https://github.com/yolain/ComfyUI-Easy-Use) | `Easy Use` | `easy cleanGpuUsed` |
+| [ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes) | `KJNodes` | `ImageResizeKJv2`, `TextPreview` |
+
+Both workflows target **FLUX.2 Klein 9B** — they expect `flux-2-klein-base-9b-fp8.safetensors` (diffusion model), `qwen_3_8b_fp8mixed.safetensors` (text encoder), and `flux2-vae.safetensors` (VAE). Swap in your own model file names in the loader nodes if they differ.
 
 ## Tips
 
